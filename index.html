@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title> 💕 Level Up Your Valentine 💕 </title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+  <!-- Floating hearts background -->
+  <div class="bg" aria-hidden="true">
+    <div class="heart h1">💗</div>
+    <div class="heart h2">💞</div>
+    <div class="heart h3">💗</div>
+    <div class="heart h4">💖</div>
+    <div class="heart h5">💗</div>
+    <div class="heart h6">💞</div>
+    <div class="heart h7">💗</div>
+    <div class="heart h8">💖</div>
+  </div>
+
+  <!-- Popup modal -->
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <div class="modal-title" id="modalTitle">A wild moment appears…</div>
+      <div class="modal-text" id="modalText"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <main class="app">
+    <header class="top">
+      <div class="brand">
+        <div class="brand-badge">🤍</div>
+        <div>
+          <h1>Level Up Your Valentine!</h1>
+          <p class="subtitle">Unlock every version of Minyoung! <br>
+            This Valentine’s Day, you get to practice the fine art of making me happy, yay! <br>
+            Failure is not cute… but I believe in you. </p>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><span>💗 Hearts</span><strong id="hearts">0</strong></div>
+        <div class="stat"><span>💞 Affection</span><strong id="affection">0</strong></div>
+        <div class="stat"><span>✨ Stage</span><strong id="stage">1</strong></div>
+        <div class="stat"><span>🙂 Mood</span><strong id="mood">neutral</strong></div>
+      </div>
+    </header>
+
+    <!-- HOME -->
+    <section class="card view" id="view-home">
+      <div class="home-grid">
+        <div class="character-wrap">
+          <img id="character" class="character" alt="Minyoung pixel character" />
+          <div class="stage-label" id="stageLabel">Stage 1: Small Agi</div>
+          <div class="tiny-note" id="passivesNote"></div>
+        </div>
+
+        <div class="home-actions">
+          <button class="btn" id="btnMiniGames">🎮 Mini Games</button>
+          <button class="btn" id="btnShop">🛍️ Shop</button>
+          <button class="btn ghost" id="btnReset">🧼 Reset Save</button>
+
+          <div class="dialogue" id="dialogue"></div>
+
+          <div class="inventory">
+            <div class="inventory-head">🎒 Inventory</div>
+            <div class="inventory-list" id="inventoryList"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MINI GAMES MENU -->
+    <section class="card view hidden" id="view-minigames">
+      <div class="view-head">
+        <h2>🎮 Mini Games</h2>
+        <button class="btn ghost" data-nav="home">← Back</button>
+      </div>
+
+      <p class="tip">Each game gives 💗 Hearts + hidden affection. (Perfume boosts affection gains.)</p>
+
+      <div class="grid">
+        <button class="tile" data-game="catch">
+          <div class="tile-title">💗 Catch the Hearts</div>
+          <div class="tile-sub">Move basket, catch falling hearts (20s)</div>
+        </button>
+        <button class="tile" data-game="pop">
+          <div class="tile-title">🫧 Pop the Hearts</div>
+          <div class="tile-sub">Click hearts as fast as you can (15s)</div>
+        </button>
+        <button class="tile" data-game="memory">
+          <div class="tile-title">🃏 Memory Match</div>
+          <div class="tile-sub">Match pairs to win bonus hearts</div>
+        </button>
+        <button class="tile" data-game="react">
+          <div class="tile-title">⚡ Reaction Heart</div>
+          <div class="tile-sub">Click only when the heart turns pink</div>
+        </button>
+        <button class="tile" data-game="dino">
+          <div class="tile-title">🦖 Run, Cuddlosaurus! </div>
+          <div class="tile-sub">Jump over obstacles • Space/↑ to jump (30s)</div>
+        </button>
+      </div>
+    </section>
+
+    <!-- SHOP -->
+    <section class="card view hidden" id="view-shop">
+      <div class="view-head">
+        <h2>🛍️ Shop</h2>
+        <button class="btn ghost" data-nav="home">← Back</button>
+      </div>
+
+      <p class="tip">Buy gifts with 💗 Hearts. Some items have hidden effects! 🤫</p>
+      <div id="shopList" class="shop-list"></div>
+    </section>
+
+    <!-- GAME PLAY AREA -->
+    <section class="card view hidden" id="view-game">
+      <div class="view-head">
+        <h2 id="gameTitle">Game</h2>
+        <div class="view-actions">
+          <button class="btn ghost" id="btnQuitGame">← Quit</button>
+        </div>
+      </div>
+
+      <div id="gameArea" class="game-area"></div>
+    </section>
+  </main>
+
+  <!-- Optional background music file -->
+  <audio id="bgMusic" loop autoplay>
+    <source src="assets/music/cute-arcade.mp3" type="audio/mpeg" />
+  </audio>
+
+  <script>
+    // Start music on the first user interaction (browsers block true autoplay with sound)
+    const bgMusic = document.getElementById("bgMusic");
+
+    function startBgMusic() {
+      bgMusic.play().catch(() => {});
+      document.removeEventListener("pointerdown", startBgMusic);
+    }
+
+    document.addEventListener("pointerdown", startBgMusic);
+  </script>
+
+  <script src="game.js"></script>
+</body>
+</html>
+
+
+
+
+
