@@ -233,7 +233,7 @@ const POPUPS = [
     title: "What do you fucking want?",
     text: "It's her birthday! She says:\n“Nate, you totally don't have to get me anything...”\nYou…",
     options: [
-      { label: `literally prepare nothing and tell her "my presence is the gift"`, mood: "sad", hearts: -20, affection: -20 },
+      { label: `take her words literally and don't get her anything.`, mood: "sad", hearts: -20, affection: -20 },
       { label: "Get her a dozen of Krispy Kreme donuts with cute candles", mood: "happy", hearts: +2, affection: +5 },
       { label: "Write her a beautiful, heartfelt card.", mood: "happy", hearts: +2, affection: -2 },
       { label: "Get her the item she mentioned she liked before.", mood: "happy", hearts: +20, affection: +20 },
@@ -1452,6 +1452,7 @@ startIdleWatcher();
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
