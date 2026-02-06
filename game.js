@@ -25,8 +25,8 @@ const SAVE_KEY = "minyoungMakerSave_v3";
 const state = {
   hearts: 0,
   affection: 0,
-  stage: 1,                 // 1..4 only
-  mood: "neutral",          // neutral | happy | sad | angry
+  stage: 1, // 1..4 only
+  mood: "neutral", // neutral | happy | sad | angry
   inventory: [],
   affectionMult: 1.0,
   flags: {},
@@ -41,14 +41,18 @@ const state = {
 };
 
 const STAGE_LABELS = {
-  1: "Stage 1: Toddler",
-  2: "Stage 2: Child",
-  3: "Stage 3: College",
-  4: "Stage 4: Adult"
+  1: "Stage 1: Small Agi",
+  2: "Stage 2: Medium Agi",
+  3: "Stage 3: Big Agi",
+  4: "Stage 4: Like Giant Agi"
 };
 
-function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-function clampStage(n) { return clamp(n, 1, 4); }
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+function clampStage(n) {
+  return clamp(n, 1, 4);
+}
 
 function save() {
   localStorage.setItem(SAVE_KEY, JSON.stringify(state));
@@ -80,7 +84,7 @@ function speak(msg) {
 }
 
 function showView(name) {
-  Object.values(VIEWS).forEach(v => v.classList.add("hidden"));
+  Object.values(VIEWS).forEach((v) => v.classList.add("hidden"));
   VIEWS[name].classList.remove("hidden");
 }
 
@@ -92,7 +96,7 @@ function touchAction() {
 
 function spritePathFor(stage, mood) {
   const s = clampStage(stage);
-  const m = ["happy","sad","angry","neutral"].includes(mood) ? mood : "neutral";
+  const m = ["happy", "sad", "angry", "neutral"].includes(mood) ? mood : "neutral";
   return `assets/characters/stage${s}-${m}.png`;
 }
 
@@ -113,7 +117,7 @@ function updateSprite() {
 }
 
 function setMood(newMood, opts = { persist: true }) {
-  const allowed = ["neutral","happy","sad","angry"];
+  const allowed = ["neutral", "happy", "sad", "angry"];
   state.mood = allowed.includes(newMood) ? newMood : "neutral";
   updateSprite();
   if (opts?.persist) save();
@@ -122,12 +126,12 @@ function setMood(newMood, opts = { persist: true }) {
 
 function recomputeStage() {
   // Simple auto-evolve thresholds (edit if you want)
-  // Stage 1: <80, Stage 2: 80-159, Stage 3: 160-279, Stage 4: 280+
+  // Stage 1: <150, Stage 2: 150-499, Stage 3: 500-999, Stage 4: 1000+
   const a = state.affection || 0;
   let newStage = 1;
-  if (a >= 80) newStage = 2;
-  if (a >= 160) newStage = 3;
-  if (a >= 280) newStage = 4;
+  if (a >= 150) newStage = 2;
+  if (a >= 500) newStage = 3;
+  if (a >= 1000) newStage = 4;
 
   newStage = clampStage(newStage);
   if (newStage !== state.stage) {
@@ -153,20 +157,32 @@ function addRewards(heartsEarned, affectionEarned) {
 }
 
 /***********************
-  Idle anger watcher
+  Idle anger/sadness watcher
 ************************/
 function startIdleWatcher() {
   setInterval(() => {
     const now = Date.now();
     const idleMs = now - (state.lastActionAt || now);
-    if (idleMs >= 30000) {
+
+    // 60 seconds → Angry
+    if (idleMs >= 60000) {
       if (state.mood !== "angry") {
         setMood("angry", { persist: true });
-        speak("Minyoung is waiting… and getting annoyed 😭 (Go play a game or buy a gift.)");
+        speak("Minyoung has been waiting forever!! 😤");
       }
     }
+
+    // 30 seconds → Sad (only if not already angry)
+    else if (idleMs >= 30000) {
+      if (state.mood !== "sad") {
+        setMood("sad", { persist: true });
+        speak("Stella looks a little lonely… 🥺");
+      }
+    }
+
   }, 500);
 }
+
 
 /***********************
   Popup Questions (not obvious)
@@ -213,12 +229,12 @@ const POPUPS = [
       { label: "Ask for a rubric so you can understand vibe categories.", mood: "angry", hearts: +1, affection: -2 }
     ]
   },
-    {
+  {
     title: "What do you fucking want?",
     text: "It's her birthday! She says:\n“Nate, you totally don't have to get me anything...”\nYou…",
     options: [
-      { label: "literally prepare nothing and tell her it's not a big deal.", mood: "sad", hearts: -20, affection: -20 },
-      { label: "Get her a dozen of Krispy Kreme donuts with cute candles.", mood: "happy", hearts: +2, affection: +5 },
+      { label: `literally prepare nothing and tell her "my presence is the gift"`, mood: "sad", hearts: -20, affection: -20 },
+      { label: "Get her a dozen of Krispy Kreme donuts with cute candles", mood: "happy", hearts: +2, affection: +5 },
       { label: "Write her a beautiful, heartfelt card.", mood: "happy", hearts: +2, affection: -2 },
       { label: "Get her the item she mentioned she liked before.", mood: "happy", hearts: +20, affection: +20 },
       { label: "Go on a trip to Cancun by yourself to avoid all this.", mood: "angry", hearts: -100, affection: -100 }
@@ -234,7 +250,7 @@ function maybePopup(context = "any") {
     return;
   }
 
-  let chance = (context === "afterGame") ? 0.55 : (context === "afterGift") ? 0.35 : 0.25;
+  let chance = context === "afterGame" ? 0.55 : context === "afterGift" ? 0.35 : 0.25;
 
   // Tornado Fudge slightly increases popup chance
   if (state.buffTornadoFudge > 0 && Math.random() < 0.25) chance += 0.12;
@@ -262,7 +278,7 @@ function openPopup(popup) {
   const actions = $("modalActions");
   actions.innerHTML = "";
 
-  popup.options.forEach(opt => {
+  popup.options.forEach((opt) => {
     const btn = document.createElement("button");
     btn.className = "btn";
     btn.innerText = opt.label;
@@ -287,12 +303,12 @@ function openPopup(popup) {
       }
 
       if (state.buffGoofyNate > 0 && finalMood !== "happy") {
-        if (Math.random() < 0.30) finalMood = "happy";
+        if (Math.random() < 0.3) finalMood = "happy";
       }
 
       if (state.buffTornadoFudge > 0 && (finalMood === "sad" || finalMood === "angry")) {
-        if (Math.random() < 0.40) finalMood = "neutral";
-        if (Math.random() < 0.20) finalMood = "happy";
+        if (Math.random() < 0.4) finalMood = "neutral";
+        if (Math.random() < 0.2) finalMood = "happy";
       }
 
       setMood(finalMood, { persist: true });
@@ -302,10 +318,10 @@ function openPopup(popup) {
       renderHUD();
 
       const reaction = {
-        happy: "Minyoung looks pleased. Like… dangerously pleased 💗",
-        sad: "Minyoung goes quiet. You feel like you missed something 😭",
-        angry: "Minyoung is smiling… but it’s the kind that’s a warning 🙂",
-        neutral: "Minyoung nods. The vibe is… stable."
+        happy: "Minyoung looks pleased. Her black black eyes are filled with joy 💗",
+        sad: "Minyoung goes quiet. Her black black eyes get watery. You feel like you missed something 😭",
+        angry: "Minyoung's voice gets louder and louder... uh-oh, she's getting upset!",
+        neutral: "Minyoung is... watching you."
       }[finalMood];
 
       speak(reaction);
@@ -355,12 +371,15 @@ function renderHUD() {
   if (state.inventory.length === 0) {
     inv.innerHTML = `<span class="small">No items yet. Nate, go spoil her 😌</span>`;
   } else {
-    state.inventory.slice().reverse().forEach(name => {
-      const pill = document.createElement("div");
-      pill.className = "pill";
-      pill.innerText = name;
-      inv.appendChild(pill);
-    });
+    state.inventory
+      .slice()
+      .reverse()
+      .forEach((name) => {
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.innerText = name;
+        inv.appendChild(pill);
+      });
   }
 
   updateSprite();
@@ -373,12 +392,12 @@ const SHOP_ITEMS = [
   {
     id: "perfume",
     name: `🐾 “Drake Memory” Perfume (Anal Glands Scented)`,
-    cost: 90,
+    cost: 150,
     affectionHidden: 75,
     type: "Soul Item",
-    desc: `A ridiculously named scent that somehow smells warm and comforting instead of questionable.
+    desc: `A ridiculously strong scent that somehow smells just like when Drake's anal gland was leaking.
 When worn, Minyoung gains the passive ability “Love That Never Leaves,” increasing all affection gains by 10% for the rest of the year.`,
-    flavor: `"Some loves don’t fade. They just change form."`,
+    flavor: `"Some loves don’t fade. They just linger."`,
     unique: true,
     onBuy() {
       state.flags.perfume = true;
@@ -388,16 +407,18 @@ When worn, Minyoung gains the passive ability “Love That Never Leaves,” incr
   {
     id: "tennisBall",
     name: `🎾 Fudge’s Blessed Tennis Ball`,
-    cost: 80,
+    cost: 100,
     affectionHidden: 65,
     type: "Companion Relic",
-    desc: `Slightly slobbery. Extremely sacred. Holding it instantly restores Minyoung’s mood and prevents one bad day per month.
+    desc: `Slightly slobbery. Extremely bouncy. Holding it instantly restores Minyoung’s mood and prevents one bad day per month.
 
 Special Ability: Unlocks “Golden Retriever Energy”
 → negative events have a 30% chance to turn into funny memories.`,
     flavor: `"Joy is loud, neon, and covered in dog hair."`,
     unique: true,
-    onBuy() { state.flags.tennisBall = true; }
+    onBuy() {
+      state.flags.tennisBall = true;
+    }
   },
   {
     id: "persimmon",
@@ -409,23 +430,25 @@ Special Ability: Unlocks “Golden Retriever Energy”
 
 Hidden Effect:
 If gifted unexpectedly → something good might happen.`,
-    flavor: `"Sweetness arrives quietly."`,
+    flavor: `"Sweetness arrives so intensely."`,
     unique: false,
-    onBuy() { if (Math.random() < 0.30) state.affection += 10; }
+    onBuy() {
+      if (Math.random() < 0.3) state.affection += 10;
+    }
   },
   {
     id: "squid",
     name: `🦑 Dangerously Addictive Dried Squid (가문어)`,
-    cost: 22,
+    cost: 30,
     affectionHidden: 18,
     type: "Snack Buff",
     desc: `Chewy, savory, impossible to stop eating. Restores energy after long workdays.
 
-Combo Bonus:
-Pairs with Movie Night → something happens.`,
     flavor: `"Just one more bite… probably."`,
     unique: false,
-    onBuy() { state.flags.squid = true; }
+    onBuy() {
+      state.flags.squid = true;
+    }
   },
   {
     id: "dinner",
@@ -439,7 +462,9 @@ Hidden Bonus:
 If he remembered the exact order…`,
     flavor: `"You looked tired. So I handled dinner."`,
     unique: false,
-    onBuy() { if (Math.random() < 0.35) state.affection += 5; }
+    onBuy() {
+      if (Math.random() < 0.35) state.affection += 5;
+    }
   },
   {
     id: "coffee",
@@ -473,7 +498,9 @@ Reduces morning grumpiness.`,
     desc: `A small, random object that proves you live in his brain.`,
     flavor: `"It had your energy."`,
     unique: false,
-    onBuy() { state.affection += Math.floor(Math.random() * 9); }
+    onBuy() {
+      state.affection += Math.floor(Math.random() * 9);
+    }
   },
   {
     id: "fruit",
@@ -484,7 +511,9 @@ Reduces morning grumpiness.`,
     desc: `Was it necessary? No. Did he do it anyway? Yes.`,
     flavor: `"Eat. I know you forget."`,
     unique: false,
-    onBuy() { if (Math.random() < 0.50) state.affection += 4; }
+    onBuy() {
+      if (Math.random() < 0.5) state.affection += 4;
+    }
   },
   {
     id: "lastOne",
@@ -509,8 +538,8 @@ Reduces morning grumpiness.`,
   {
     id: "foreheadKiss",
     name: `💤 Forehead Kiss`,
-    cost: 28,
-    affectionHidden: 21,
+    cost: 20,
+    affectionHidden: 50,
     type: "Security",
     desc: `Gentle. Unrushed. Usually when you least expect it.`,
     flavor: `"Right here is my favorite place."`,
@@ -519,8 +548,8 @@ Reduces morning grumpiness.`,
   {
     id: "foreheadBlanket",
     name: `🌙 Forehead Blanket`,
-    cost: 30,
-    affectionHidden: 23,
+    cost: 100,
+    affectionHidden: 150,
     type: "Cozy Item",
     desc: `A gentle hand rests across your forehead, shielding your eyes from the world.
 
@@ -528,23 +557,25 @@ Primary Effect:
 Activates “Safe & Sleepy”.`,
     flavor: `"Rest. I’ve got the watch."`,
     unique: true,
-    onBuy() { state.flags.safeSleepy = true; }
+    onBuy() {
+      state.flags.safeSleepy = true;
+    }
   },
 
   /* New items you requested */
   {
     id: "koreanFeast",
-    name: `🍚 “Korean Comfort Feast” (한식 풀코스)`,
-    cost: 42,
-    affectionHidden: 0,
+    name: `🍚 “Korean Feast”`,
+    cost: 60,
+    affectionHidden: 20,
     type: "Korean Food Buff",
-    desc: `A full, comforting Korean meal that hits like a hug: warm rice, soup, two side dishes, and that “everything is okay” feeling.
+    desc: `A full, comforting Korean meal that hits like a hug: warm rice, soup, seven side dishes, and that “everything is okay” feeling.
 
 Hidden Effect:
 Activates “Homebody Harmony”
 → sad/angry outcomes become less likely for a while
 → chance to trigger a soft extra popup`,
-    flavor: `“밥 먹고 나면, 마음도 조금 풀려요.”`,
+    flavor: `“Korean food always makes her feel better.”`,
     unique: false,
     onBuy() {
       state.buffKoreanFeast = Math.max(state.buffKoreanFeast, 6);
@@ -554,8 +585,8 @@ Activates “Homebody Harmony”
   {
     id: "tornadoFudge",
     name: `🌪️🐶 “Spinning Fudge” Tornado Dog Show Ticket`,
-    cost: 33,
-    affectionHidden: 0,
+    cost: 80,
+    affectionHidden: 20,
     type: "Chaos Entertainment",
     desc: `A front-row ticket to the show where Fudge does his signature move: spinning in circles until physics begs for mercy.
 
@@ -573,8 +604,8 @@ Unlocks “Golden Retriever Energy: Tornado Edition”
   {
     id: "goofyNate",
     name: `🎭 “Goofy Nate Extravaganza” (One-Man Comedy Tour)`,
-    cost: 55,
-    affectionHidden: 0,
+    cost: 20,
+    affectionHidden: 50,
     type: "Partner Skill Upgrade",
     desc: `A fully produced evening where Nate commits to the bit with alarming dedication.
 
@@ -595,7 +626,7 @@ function renderShop() {
   const root = $("shopList");
   root.innerHTML = "";
 
-  SHOP_ITEMS.forEach(item => {
+  SHOP_ITEMS.forEach((item) => {
     const ownedUnique = item.unique && state.inventory.includes(item.name);
 
     const el = document.createElement("div");
@@ -612,7 +643,7 @@ function renderShop() {
         </div>
         <div class="shop-actions">
           <div class="cost">Cost: 💗 ${item.cost}</div>
-          <button class="btn ${ownedUnique ? "ghost": ""}" ${ownedUnique ? "disabled": ""} data-buy="${item.id}">
+          <button class="btn ${ownedUnique ? "ghost" : ""}" ${ownedUnique ? "disabled" : ""} data-buy="${item.id}">
             ${ownedUnique ? "Owned" : "Buy"}
           </button>
         </div>
@@ -621,7 +652,7 @@ function renderShop() {
     root.appendChild(el);
   });
 
-  root.querySelectorAll("[data-buy]").forEach(btn => {
+  root.querySelectorAll("[data-buy]").forEach((btn) => {
     btn.addEventListener("click", () => buyItem(btn.getAttribute("data-buy")));
   });
 }
@@ -629,7 +660,7 @@ function renderShop() {
 function buyItem(id) {
   touchAction();
 
-  const item = SHOP_ITEMS.find(x => x.id === id);
+  const item = SHOP_ITEMS.find((x) => x.id === id);
   if (!item) return;
 
   const ownedUnique = item.unique && state.inventory.includes(item.name);
@@ -681,7 +712,7 @@ $("btnReset").addEventListener("click", () => {
   location.reload();
 });
 
-document.querySelectorAll("[data-nav]").forEach(btn => {
+document.querySelectorAll("[data-nav]").forEach((btn) => {
   btn.addEventListener("click", () => {
     touchAction();
     const where = btn.getAttribute("data-nav");
@@ -705,7 +736,7 @@ $("btnQuitGame").addEventListener("click", () => {
   showView("minigames");
 });
 
-document.querySelectorAll("[data-game]").forEach(btn => {
+document.querySelectorAll("[data-game]").forEach((btn) => {
   btn.addEventListener("click", () => startGame(btn.getAttribute("data-game")));
 });
 
@@ -757,9 +788,9 @@ function gameCatch(root) {
     ctx.save();
     ctx.translate(x, y);
     ctx.beginPath();
-    ctx.moveTo(0, r/2);
-    ctx.bezierCurveTo(-r, -r/2, -r, r, 0, r*1.6);
-    ctx.bezierCurveTo(r, r, r, -r/2, 0, r/2);
+    ctx.moveTo(0, r / 2);
+    ctx.bezierCurveTo(-r, -r / 2, -r, r, 0, r * 1.6);
+    ctx.bezierCurveTo(r, r, r, -r / 2, 0, r / 2);
     ctx.fillStyle = "rgba(255,77,136,.95)";
     ctx.fill();
     ctx.restore();
@@ -772,7 +803,10 @@ function gameCatch(root) {
     tLeft -= dt * 1000;
 
     spawnTimer += dt * 1000;
-    if (spawnTimer >= spawnEvery) { spawnTimer = 0; spawn(); }
+    if (spawnTimer >= spawnEvery) {
+      spawnTimer = 0;
+      spawn();
+    }
 
     basket.x += basket.vx * dt;
     basket.x = Math.max(0, Math.min(c.width - basket.w, basket.x));
@@ -786,7 +820,10 @@ function gameCatch(root) {
         h.y + h.r > basket.y &&
         h.y - h.r < basket.y + basket.h;
 
-      if (hit) { score += 1; h.y = 9999; }
+      if (hit) {
+        score += 1;
+        h.y = 9999;
+      }
     }
 
     ctx.clearRect(0, 0, c.width, c.height);
@@ -817,14 +854,14 @@ function gameCatch(root) {
     addRewards(heartsEarned, affectionEarned);
 
     $("catchMsg").innerText = `Result: +${heartsEarned} hearts 💗`;
-    speak("Minyoung: “Okay wait… that was kind of satisfying.”");
+    speak("Minyoung: “Okay wait… that was kind of awesome.”");
 
     if (score >= 10) setMood("happy", { persist: true });
     else if (score <= 2 && Math.random() < 0.35) setMood("sad", { persist: true });
 
     // Goofy Nate: extra line sometimes
     if (state.buffGoofyNate > 0 && Math.random() < 0.35) {
-      speak("Minyoung: “Why do I feel proud of you right now.”");
+      speak("Minyoung: “Why do I feel so proud of you right now.”");
     }
 
     maybePopup("afterGame");
@@ -898,7 +935,7 @@ function gamePop(root) {
     running = false;
     clearInterval(spawnInterval);
     clearTimeout(timer);
-    field.querySelectorAll("button").forEach(b => b.remove());
+    field.querySelectorAll("button").forEach((b) => b.remove());
 
     const heartsEarned = clamp(score * 3, 6, 45);
     const affectionEarned = Math.max(2, Math.round(score * 1.4));
@@ -928,7 +965,7 @@ function gamePop(root) {
 function gameMemory(root) {
   $("gameTitle").innerText = "🃏 Memory Match";
 
-  const icons = ["💗","🍓","🐾","🍲","🎾","🌙","📸","🦑"];
+  const icons = ["💗", "🍓", "🐾", "🍲", "🎾", "🌙", "📸", "🦑"];
   const deck = [...icons, ...icons].sort(() => Math.random() - 0.5);
 
   root.innerHTML = `
@@ -971,7 +1008,10 @@ function gameMemory(root) {
     card.dataset.open = "1";
     card.innerText = card.dataset.val;
 
-    if (!first) { first = card; return; }
+    if (!first) {
+      first = card;
+      return;
+    }
 
     if (first.dataset.val === card.dataset.val) {
       matches++;
@@ -1097,7 +1137,7 @@ function gameReact(root) {
     addRewards(heartsEarned, affectionEarned);
 
     msg.innerText = `Result: +${heartsEarned} hearts 💗`;
-    speak("Minyoung: “Your reflexes are… boyfriend-coded.”");
+    speak("Minyoung: “Your reflexes are… like Fudge playing fetch.”");
 
     if (score >= 4) setMood("happy", { persist: true });
     else if (score <= 1 && Math.random() < 0.35) setMood("sad", { persist: true });
@@ -1120,7 +1160,7 @@ function gameReact(root) {
 /* Game 5: Minyoung Dino Run (boing + heart trail + themed obstacles) */
 function gameDino(root) {
   touchAction();
-  $("gameTitle").innerText = "🦖 Minyoung Dino Run";
+  $("gameTitle").innerText = "🦖 Run, Cuddlosaurus!";
 
   root.innerHTML = `
     <div class="game-frame">
@@ -1189,10 +1229,10 @@ function gameDino(root) {
   const obs = [];
 
   function obstacleSetForStage(stage) {
-    if (stage === 1) return ["💘","💗","🧸"];
-    if (stage === 2) return ["🎾","💘","💞"];
-    if (stage === 3) return ["☕","🦑","💘"];
-    return ["🍕","💘","감","🍂"];
+    if (stage === 1) return ["💘", "🐶", "🧸"];
+    if (stage === 2) return ["🐕", "💘", "💞"];
+    if (stage === 3) return ["☕", "🦑", "💘"];
+    return ["🍕", "💘", "🐶"];
   }
   const obstacleEmojis = obstacleSetForStage(clampStage(state.stage));
 
@@ -1221,7 +1261,7 @@ function gameDino(root) {
   }
 
   function rectsOverlap(a, b) {
-    return (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y);
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
   }
 
   function drawBackground() {
@@ -1251,7 +1291,10 @@ function gameDino(root) {
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.vy += 24 * dt;
-      if (p.life <= 0) { trail.splice(i, 1); continue; }
+      if (p.life <= 0) {
+        trail.splice(i, 1);
+        continue;
+      }
       ctx.globalAlpha = Math.max(0, p.life);
       ctx.font = `${Math.floor(p.size)}px ui-monospace, system-ui`;
       ctx.fillText(p.emoji, p.x, p.y);
@@ -1262,7 +1305,7 @@ function gameDino(root) {
   function drawPlayer() {
     ctx.globalAlpha = 0.16;
     ctx.beginPath();
-    ctx.ellipse(player.x + player.w/2, groundY + player.h + 10, 18, 6, 0, 0, Math.PI*2);
+    ctx.ellipse(player.x + player.w / 2, groundY + player.h + 10, 18, 6, 0, 0, Math.PI * 2);
     ctx.fillStyle = "#000";
     ctx.fill();
     ctx.globalAlpha = 1;
@@ -1277,7 +1320,7 @@ function gameDino(root) {
   }
 
   function drawObstacles() {
-    obs.forEach(o => {
+    obs.forEach((o) => {
       const size = o.kind === "tall" ? 28 : 24;
       ctx.font = `${size}px ui-monospace, system-ui`;
       ctx.fillText(String(o.emoji), o.x - 2, o.y + o.h);
@@ -1315,7 +1358,10 @@ function gameDino(root) {
     last = now;
 
     tLeft -= dt * 1000;
-    if (tLeft <= 0) { end(true); return; }
+    if (tLeft <= 0) {
+      end(true);
+      return;
+    }
 
     speed += dt * 7;
 
@@ -1351,7 +1397,10 @@ function gameDino(root) {
     const pHitbox = { x: player.x + 10, y: player.y + 10, w: player.w - 20, h: player.h - 16 };
     for (const o of obs) {
       const oHitbox = { x: o.x, y: o.y + 8, w: o.w + 10, h: o.h - 10 };
-      if (rectsOverlap(pHitbox, oHitbox)) { end(false); return; }
+      if (rectsOverlap(pHitbox, oHitbox)) {
+        end(false);
+        return;
+      }
     }
 
     drawBackground();
@@ -1368,7 +1417,9 @@ function gameDino(root) {
       jump();
     }
   }
-  function onTap() { jump(); }
+  function onTap() {
+    jump();
+  }
 
   function cleanup() {
     window.removeEventListener("keydown", onKey);
@@ -1394,10 +1445,14 @@ state.stage = clampStage(state.stage || 1);
 recomputeStage();
 renderHUD();
 showView("home");
-speak("Nate… your mission is simple: make Minyoung laugh, feed her, and buy emotional upgrades 💗");
+speak("Nate… your mission is simple: make Minyoung laugh, feed her, and impress her with gifts 💗");
 startIdleWatcher();
 
 // sometimes a popup greets you
-setTimeout(() => { if (Math.random() < 0.25) maybePopup("home"); }, 700);
+setTimeout(() => {
+  if (Math.random() < 0.25) maybePopup("home");
+}, 700);
+
+
 
 
