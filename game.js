@@ -7,7 +7,7 @@
   - Shop hides affection effects
   - Any gift makes Minyoung happy sprite immediately
   - Auto stage evolve (no button)
-  - Idle 30s without shopping or games => angry
+  - Idle 30s without shopping or games => sad, 60s => angry
   - Dino Run upgrades: boing SFX, heart trail, stage-themed obstacles
 ************************/
 
@@ -21,6 +21,9 @@ const VIEWS = {
 };
 
 const SAVE_KEY = "minyoungMakerSave_v3";
+
+// ✅ cache buster so sprite updates aren’t stuck in browser cache
+const SPRITE_VERSION = "v3.1";
 
 const state = {
   hearts: 0,
@@ -93,14 +96,18 @@ function showView(name) {
 
 function touchAction() {
   state.lastActionAt = Date.now();
+  // if she was angry from waiting, interacting calms her down
   if (state.mood === "angry") setMood("neutral", { persist: true });
   save();
 }
 
 function spritePathFor(stage, mood) {
   const s = clampStage(stage);
-  const m = ["happy", "sad", "angry", "neutral"].includes(mood) ? mood : "neutral";
-  return `assets/characters/stage${s}-${m}.png`;
+  const allowed = ["happy", "sad", "angry", "neutral"];
+  const m = allowed.includes(mood) ? mood : "neutral";
+
+  // ✅ cache buster makes sure switching moods loads the newest asset
+  return `assets/characters/stage${s}-${m}.png?v=${SPRITE_VERSION}`;
 }
 
 function updateSprite() {
@@ -108,14 +115,31 @@ function updateSprite() {
   if (!img) return;
 
   const desired = spritePathFor(state.stage, state.mood);
+  const neutral = spritePathFor(state.stage, "neutral");
+
+  // Clear previous handlers so they don’t stack
+  img.onload = null;
+  img.onerror = null;
+
+  // If desired fails, fall back to neutral and log why
   img.onerror = () => {
-    // fallback: neutral sprite for that stage
+    console.warn(
+      `[Sprite missing] Tried: ${desired}\nFalling back to: ${neutral}\n` +
+      `Check filename/path/case exactly matches stage${state.stage}-${state.mood}.png`
+    );
+
     img.onerror = () => {
+      console.error(
+        `[Sprite missing] Even neutral sprite failed: ${neutral}\n` +
+        `You need at least: assets/characters/stage${state.stage}-neutral.png`
+      );
       img.removeAttribute("src");
-      img.alt = "Missing sprite. Add assets/characters/stage1-neutral.png etc.";
+      img.alt = `Missing sprite(s). Add stage${state.stage}-${state.mood}.png and stage${state.stage}-neutral.png`;
     };
-    img.src = spritePathFor(state.stage, "neutral");
+
+    img.src = neutral;
   };
+
   img.src = desired;
 }
 
@@ -128,7 +152,6 @@ function setMood(newMood, opts = { persist: true }) {
 }
 
 function recomputeStage() {
-  // Simple auto-evolve thresholds (edit if you want)
   // Stage 1: <150, Stage 2: 150-499, Stage 3: 500-999, Stage 4: 1000+
   const a = state.affection || 0;
   let newStage = 1;
@@ -139,7 +162,6 @@ function recomputeStage() {
   newStage = clampStage(newStage);
   if (newStage !== state.stage) {
     state.stage = newStage;
-    // stage change goes neutral (sprite updates automatically)
     state.mood = "neutral";
   }
 
@@ -244,10 +266,8 @@ const POPUPS = [
 ];
 
 function maybePopup(context = "any") {
-  // ✅ never show random popups during mini-games
   if (isMiniGameRunning) return;
 
-  // cooldown to reduce spam
   if (state.popupCooldown > 0) {
     state.popupCooldown -= 1;
     save();
@@ -256,7 +276,6 @@ function maybePopup(context = "any") {
 
   let chance = context === "afterGame" ? 0.55 : context === "afterGift" ? 0.35 : 0.25;
 
-  // Tornado Fudge slightly increases popup chance
   if (state.buffTornadoFudge > 0 && Math.random() < 0.25) chance += 0.12;
 
   if (Math.random() > chance) return;
@@ -266,7 +285,6 @@ function maybePopup(context = "any") {
 
   state.popupCooldown = 2;
 
-  // tick down timed buffs whenever a popup happens
   if (state.buffKoreanFeast > 0) state.buffKoreanFeast -= 1;
   if (state.buffTornadoFudge > 0) state.buffTornadoFudge -= 1;
   if (state.buffGoofyNate > 0) state.buffGoofyNate -= 1;
@@ -298,7 +316,6 @@ function openPopup(popup) {
         state.affection += boosted;
       }
 
-      // ---- Buff logic: gently bend outcomes (not obvious) ----
       let finalMood = opt.mood;
 
       if (state.buffKoreanFeast > 0 && (finalMood === "sad" || finalMood === "angry")) {
@@ -362,7 +379,6 @@ function openItemPopup(item, affectionGained) {
   lines.push(``);
   lines.push(`💗 Affection gained: +${affectionGained}`);
 
-  // show a quick “buff summary” when relevant
   if (item.id === "perfume") lines.push(`✨ Buff: +10% affection gains (passive)`);
   if (item.id === "tennisBall") lines.push(`✨ Buff: 30% chance bad moments become funny memories`);
   if (item.id === "foreheadBlanket") lines.push(`✨ Unlock: Safe & Sleepy`);
@@ -600,8 +616,6 @@ Activates “Safe & Sleepy”.`,
       state.flags.safeSleepy = true;
     }
   },
-
-  /* New items you requested */
   {
     id: "koreanFeast",
     name: `🍚 “Korean Feast”`,
@@ -712,7 +726,6 @@ function buyItem(id) {
 
   state.hearts -= item.cost;
 
-  // hidden affection value
   const hidden = item.affectionHidden ?? 0;
   const boosted = Math.round(hidden * (state.affectionMult || 1));
   state.affection += boosted;
@@ -720,7 +733,6 @@ function buyItem(id) {
   state.inventory.push(item.name);
   if (typeof item.onBuy === "function") item.onBuy();
 
-  // Any gift => happy immediately
   setMood("happy", { persist: true });
   speak("Minyoung received a gift… and her mood instantly improved 💗");
 
@@ -729,11 +741,7 @@ function buyItem(id) {
   renderHUD();
   renderShop();
 
-  // ✅ show “what it did” popup AFTER effects are applied
   openItemPopup(item, boosted);
-
-  // ❌ removed: maybePopup("afterGift");
-  // (prevents stacked modals + keeps shop reward feeling clean)
 }
 
 /***********************
@@ -777,7 +785,7 @@ $("btnQuitGame").addEventListener("click", () => {
   if (stopCurrentGame) stopCurrentGame();
   stopCurrentGame = null;
 
-  isMiniGameRunning = false; // ✅ ensure lock releases on quit
+  isMiniGameRunning = false;
 
   showView("minigames");
 });
@@ -788,7 +796,7 @@ document.querySelectorAll("[data-game]").forEach((btn) => {
 
 function startGame(key) {
   touchAction();
-  isMiniGameRunning = true; // ✅ lock popups during games
+  isMiniGameRunning = true;
 
   showView("game");
   const area = $("gameArea");
@@ -897,7 +905,7 @@ function gameCatch(root) {
 
   function end() {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+    isMiniGameRunning = false;
 
     const heartsEarned = clamp(score * 2, 5, 40);
     const affectionEarned = Math.max(2, Math.round(score * 1.2));
@@ -909,7 +917,6 @@ function gameCatch(root) {
     if (score >= 10) setMood("happy", { persist: true });
     else if (score <= 2 && Math.random() < 0.35) setMood("sad", { persist: true });
 
-    // Goofy Nate: extra line sometimes
     if (state.buffGoofyNate > 0 && Math.random() < 0.35) {
       speak("Minyoung: “Why do I feel so proud of you right now.”");
     }
@@ -931,7 +938,7 @@ function gameCatch(root) {
 
   stopCurrentGame = () => {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock if user quits
+    isMiniGameRunning = false;
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("keyup", onKeyUp);
   };
@@ -984,7 +991,7 @@ function gamePop(root) {
 
   function end() {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+    isMiniGameRunning = false;
 
     clearInterval(spawnInterval);
     clearTimeout(timer);
@@ -1009,7 +1016,7 @@ function gamePop(root) {
 
   stopCurrentGame = () => {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock if user quits
+    isMiniGameRunning = false;
     clearInterval(spawnInterval);
     clearTimeout(timer);
   };
@@ -1094,7 +1101,7 @@ function gameMemory(root) {
   function end() {
     if (finished) return;
     finished = true;
-    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+    isMiniGameRunning = false;
 
     const heartsEarned = 40;
     const affectionEarned = 18;
@@ -1114,7 +1121,7 @@ function gameMemory(root) {
   }
 
   stopCurrentGame = () => {
-    isMiniGameRunning = false; // ✅ unlock if user quits
+    isMiniGameRunning = false;
     finished = true;
   };
 }
@@ -1193,7 +1200,7 @@ function gameReact(root) {
 
   function end() {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+    isMiniGameRunning = false;
 
     clearTimeout(timeoutId);
 
@@ -1216,14 +1223,14 @@ function gameReact(root) {
 
   stopCurrentGame = () => {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock if user quits
+    isMiniGameRunning = false;
     clearTimeout(timeoutId);
   };
 
   nextRound();
 }
 
-/* Game 5: Minyoung Dino Run (boing + heart trail + themed obstacles) */
+/* Game 5: Minyoung Dino Run */
 function gameDino(root) {
   touchAction();
   $("gameTitle").innerText = "🦖 Run, Cuddlosaurus!";
@@ -1242,7 +1249,6 @@ function gameDino(root) {
   const canvas = $("dinoCanvas");
   const ctx = canvas.getContext("2d");
 
-  // boing SFX using WebAudio
   let audioCtx = null;
   function beep(freq = 520, dur = 0.06, type = "triangle", gain = 0.03) {
     try {
@@ -1275,7 +1281,7 @@ function gameDino(root) {
   const groundY = 260;
 
   const sprite = new Image();
-  sprite.src = `assets/characters/stage${clampStage(state.stage)}-neutral.png`;
+  sprite.src = `assets/characters/stage${clampStage(state.stage)}-neutral.png?v=${SPRITE_VERSION}`;
 
   const player = { x: 90, y: groundY, w: 52, h: 60, vy: 0, onGround: true };
 
@@ -1395,7 +1401,7 @@ function gameDino(root) {
 
   function end(winLike = true) {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+    isMiniGameRunning = false;
     cleanup();
 
     const heartsEarned = clamp(Math.round(score / 12) + 10, 10, 60);
@@ -1498,7 +1504,7 @@ function gameDino(root) {
 
   stopCurrentGame = () => {
     running = false;
-    isMiniGameRunning = false; // ✅ unlock if user quits
+    isMiniGameRunning = false;
     cleanup();
   };
 
@@ -1516,7 +1522,6 @@ showView("home");
 speak("Nate… your mission is simple: make Minyoung laugh, feed her, and impress her with gifts 💗");
 startIdleWatcher();
 
-// sometimes a popup greets you
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
