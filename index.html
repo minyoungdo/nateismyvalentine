@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title> 💕 Level Up Your Valentine 💕 </title>
   <link rel="stylesheet" href="style.css" />
+
+  <!-- IMPORTANT: defer ensures game.js runs after the DOM is built -->
+  <script src="game.js" defer></script>
 </head>
 
 <body>
@@ -35,9 +38,11 @@
         <div class="brand-badge">🤍</div>
         <div>
           <h1>Level Up Your Valentine!</h1>
-          <p class="subtitle">Unlock every version of Minyoung! <br>
+          <p class="subtitle">
+            Unlock every version of Minyoung! <br>
             This Valentine’s Day, you get to practice the fine art of making me happy, yay! <br>
-            Failure is not cute… but I believe in you. </p>
+            Failure is not cute… but I believe in you.
+          </p>
         </div>
       </div>
 
@@ -100,7 +105,7 @@
           <div class="tile-sub">Click only when the heart turns pink</div>
         </button>
         <button class="tile" data-game="dino">
-          <div class="tile-title">🦖 Run, Cuddlosaurus! </div>
+          <div class="tile-title">🦖 Run, Cuddlosaurus!</div>
           <div class="tile-sub">Jump over obstacles • Space/↑ to jump (30s)</div>
         </button>
       </div>
@@ -131,27 +136,17 @@
   </main>
 
   <!-- Optional background music file -->
-  <audio id="bgMusic" loop autoplay>
+  <audio id="bgMusic" loop>
     <source src="assets/music/cute-arcade.mp3" type="audio/mpeg" />
   </audio>
 
   <script>
     // Start music on the first user interaction (browsers block true autoplay with sound)
-    const bgMusic = document.getElementById("bgMusic");
-
-    function startBgMusic() {
+    document.addEventListener("pointerdown", () => {
+      const bgMusic = document.getElementById("bgMusic");
+      if (!bgMusic) return;
       bgMusic.play().catch(() => {});
-      document.removeEventListener("pointerdown", startBgMusic);
-    }
-
-    document.addEventListener("pointerdown", startBgMusic);
+    }, { once: true });
   </script>
-
-  <script src="game.js"></script>
 </body>
 </html>
-
-
-
-
-
