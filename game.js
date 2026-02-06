@@ -442,7 +442,7 @@ If gifted unexpectedly → something good might happen.`,
     cost: 30,
     affectionHidden: 18,
     type: "Snack Buff",
-    desc: `Chewy, savory, impossible to stop eating. Restores energy after long workdays.`
+    desc: `Chewy, savory, impossible to stop eating. Restores energy after long workdays.`,
 
     flavor: `"Just one more bite… probably."`,
     unique: false,
@@ -1452,6 +1452,7 @@ startIdleWatcher();
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
