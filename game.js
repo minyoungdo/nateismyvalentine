@@ -40,6 +40,9 @@ const state = {
   lastActionAt: Date.now()
 };
 
+// ✅ NEW: global lock so random popups never fire during mini-games
+let isMiniGameRunning = false;
+
 const STAGE_LABELS = {
   1: "Stage 1: Small Agi",
   2: "Stage 2: Medium Agi",
@@ -179,10 +182,8 @@ function startIdleWatcher() {
         speak("Stella looks a little lonely… 🥺");
       }
     }
-
   }, 500);
 }
-
 
 /***********************
   Popup Questions (not obvious)
@@ -243,6 +244,9 @@ const POPUPS = [
 ];
 
 function maybePopup(context = "any") {
+  // ✅ never show random popups during mini-games
+  if (isMiniGameRunning) return;
+
   // cooldown to reduce spam
   if (state.popupCooldown > 0) {
     state.popupCooldown -= 1;
@@ -348,6 +352,42 @@ function closePopup() {
 }
 
 /***********************
+  ✅ Item effect popup (shop feedback)
+************************/
+function openItemPopup(item, affectionGained) {
+  const modal = $("modal");
+
+  const lines = [];
+  lines.push(`${item.name}`);
+  lines.push(``);
+  lines.push(`💗 Affection gained: +${affectionGained}`);
+
+  // show a quick “buff summary” when relevant
+  if (item.id === "perfume") lines.push(`✨ Buff: +10% affection gains (passive)`);
+  if (item.id === "tennisBall") lines.push(`✨ Buff: 30% chance bad moments become funny memories`);
+  if (item.id === "foreheadBlanket") lines.push(`✨ Unlock: Safe & Sleepy`);
+  if (item.id === "koreanFeast") lines.push(`✨ Buff: Homebody Harmony (sad/angry outcomes less likely)`);
+  if (item.id === "tornadoFudge") lines.push(`✨ Buff: Tornado Edition (more flips to neutral/happy, more chaos popups)`);
+  if (item.id === "goofyNate") lines.push(`✨ Buff: My Favorite Person (happy outcomes boosted)`);
+
+  if (item.unique) lines.push(`🌟 Unique item acquired!`);
+
+  $("modalTitle").innerText = "✨ Gift Effect";
+  $("modalText").innerText = lines.join("\n");
+
+  const actions = $("modalActions");
+  actions.innerHTML = "";
+
+  const ok = document.createElement("button");
+  ok.className = "btn";
+  ok.innerText = "Aww 💕";
+  ok.addEventListener("click", () => closePopup());
+  actions.appendChild(ok);
+
+  modal.classList.remove("hidden");
+}
+
+/***********************
   HUD
 ************************/
 function renderHUD() {
@@ -443,7 +483,6 @@ If gifted unexpectedly → something good might happen.`,
     affectionHidden: 18,
     type: "Snack Buff",
     desc: `Chewy, savory, impossible to stop eating. Restores energy after long workdays.`,
-
     flavor: `"Just one more bite… probably."`,
     unique: false,
     onBuy() {
@@ -690,7 +729,11 @@ function buyItem(id) {
   renderHUD();
   renderShop();
 
-  maybePopup("afterGift");
+  // ✅ show “what it did” popup AFTER effects are applied
+  openItemPopup(item, boosted);
+
+  // ❌ removed: maybePopup("afterGift");
+  // (prevents stacked modals + keeps shop reward feeling clean)
 }
 
 /***********************
@@ -733,6 +776,9 @@ $("btnQuitGame").addEventListener("click", () => {
   touchAction();
   if (stopCurrentGame) stopCurrentGame();
   stopCurrentGame = null;
+
+  isMiniGameRunning = false; // ✅ ensure lock releases on quit
+
   showView("minigames");
 });
 
@@ -742,6 +788,8 @@ document.querySelectorAll("[data-game]").forEach((btn) => {
 
 function startGame(key) {
   touchAction();
+  isMiniGameRunning = true; // ✅ lock popups during games
+
   showView("game");
   const area = $("gameArea");
   area.innerHTML = "";
@@ -849,6 +897,8 @@ function gameCatch(root) {
 
   function end() {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+
     const heartsEarned = clamp(score * 2, 5, 40);
     const affectionEarned = Math.max(2, Math.round(score * 1.2));
     addRewards(heartsEarned, affectionEarned);
@@ -881,6 +931,7 @@ function gameCatch(root) {
 
   stopCurrentGame = () => {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock if user quits
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("keyup", onKeyUp);
   };
@@ -933,6 +984,8 @@ function gamePop(root) {
 
   function end() {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+
     clearInterval(spawnInterval);
     clearTimeout(timer);
     field.querySelectorAll("button").forEach((b) => b.remove());
@@ -956,6 +1009,7 @@ function gamePop(root) {
 
   stopCurrentGame = () => {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock if user quits
     clearInterval(spawnInterval);
     clearTimeout(timer);
   };
@@ -984,6 +1038,7 @@ function gameMemory(root) {
   let lock = false;
   let matches = 0;
   let misses = 0;
+  let finished = false;
 
   function makeCard(i) {
     const btn = document.createElement("button");
@@ -1002,6 +1057,7 @@ function gameMemory(root) {
   }
 
   function onFlip(card) {
+    if (finished) return;
     if (lock) return;
     if (card.dataset.open === "1") return;
 
@@ -1036,6 +1092,10 @@ function gameMemory(root) {
   deck.forEach((_, i) => grid.appendChild(makeCard(i)));
 
   function end() {
+    if (finished) return;
+    finished = true;
+    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+
     const heartsEarned = 40;
     const affectionEarned = 18;
     addRewards(heartsEarned, affectionEarned);
@@ -1053,7 +1113,10 @@ function gameMemory(root) {
     maybePopup("afterGame");
   }
 
-  stopCurrentGame = () => {};
+  stopCurrentGame = () => {
+    isMiniGameRunning = false; // ✅ unlock if user quits
+    finished = true;
+  };
 }
 
 /* Game 4: Reaction Heart */
@@ -1130,6 +1193,8 @@ function gameReact(root) {
 
   function end() {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
+
     clearTimeout(timeoutId);
 
     const heartsEarned = 12 + score * 8;
@@ -1151,6 +1216,7 @@ function gameReact(root) {
 
   stopCurrentGame = () => {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock if user quits
     clearTimeout(timeoutId);
   };
 
@@ -1329,6 +1395,7 @@ function gameDino(root) {
 
   function end(winLike = true) {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock popups only AFTER game ends
     cleanup();
 
     const heartsEarned = clamp(Math.round(score / 12) + 10, 10, 60);
@@ -1431,6 +1498,7 @@ function gameDino(root) {
 
   stopCurrentGame = () => {
     running = false;
+    isMiniGameRunning = false; // ✅ unlock if user quits
     cleanup();
   };
 
@@ -1452,11 +1520,3 @@ startIdleWatcher();
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
-
-
-
-
-
-
-
-
