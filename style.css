@@ -8,16 +8,26 @@
   --ink:#2a2a2a;
   --muted:#6a6a6a;
   --shadow: 0 18px 50px rgba(255, 100, 150, .22);
+
+  /* ✅ Cute fonts (Google Fonts) */
+  --font-ui: "Nunito", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --font-cute: "Fredoka", "Nunito", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 *{box-sizing:border-box}
 
 body{
   margin:0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-family: var(--font-ui);
   color:var(--ink);
   background: linear-gradient(135deg,var(--bg1),var(--bg2));
   min-height:100vh;
+}
+
+/* ✅ Make titles + buttons cute */
+h1, h2, .tile-title, .shop-name, .modal-title, .stage-label, .btn{
+  font-family: var(--font-cute);
+  letter-spacing: .2px;
 }
 
 /* Background floating hearts */
