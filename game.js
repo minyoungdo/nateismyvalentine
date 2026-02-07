@@ -9,6 +9,14 @@
   - Auto stage evolve (no button)
   - Idle 30s without shopping or games => sad, 60s => angry
   - Dino Run upgrades: boing SFX, heart trail, stage-themed obstacles
+
+  ✅ NEW (added by request):
+  - Stage Trials: evolution requires pass/fail mini-trial
+      Stage 2 Trial: Make Perfect Dakgalbi
+      Stage 3 Trial: Pixel Space Pinball (uses aliendog.png)
+      Stage 4 Trial: Star Beat Rhythm Trial
+  - Final Trial at affection >= 1111:
+      Cute dating VN with multiple ending paths + uses character assets
 ************************/
 
 const $ = (id) => document.getElementById(id);
@@ -25,6 +33,15 @@ const SAVE_KEY = "minyoungMakerSave_v3";
 // ✅ cache buster so sprite updates aren’t stuck in browser cache
 const SPRITE_VERSION = "v3.1";
 
+// ✅ NEW: ending threshold
+const FINAL_THRESHOLD = 1111;
+
+// ✅ NEW: stage thresholds
+const STAGE_THRESHOLDS = { 2: 150, 3: 500, 4: 1000 };
+
+// ✅ NEW: dog asset for pinball trial
+const ALIENDOG_SRC = `assets/aliendog.png?v=${SPRITE_VERSION}`;
+
 const state = {
   hearts: 0,
   affection: 0,
@@ -40,11 +57,20 @@ const state = {
   buffTornadoFudge: 0,
   buffGoofyNate: 0,
 
-  lastActionAt: Date.now()
+  lastActionAt: Date.now(),
+
+  // ✅ NEW: Trial / Ending progress
+  stageTrialPassed: { 2: false, 3: false, 4: false },
+  pendingStage: 0,
+  trialCooldownUntil: 0, // avoid immediate retrigger loops if they quit
+  seenFinal: false,
+  endingState: { sweet: 0, silly: 0, brave: 0, choices: [] }
 };
 
-// ✅ NEW: global lock so random popups never fire during mini-games
+// ✅ NEW: global locks so random popups never fire during mini-games / trials / endings
 let isMiniGameRunning = false;
+let isTrialRunning = false;
+let isEndingRunning = false;
 
 const STAGE_LABELS = {
   1: "Stage 1: Small Agi",
@@ -82,6 +108,14 @@ function load() {
 
     state.lastActionAt ||= Date.now();
     state.stage = clampStage(state.stage || 1);
+
+    // ✅ NEW defaults
+    state.stageTrialPassed ||= { 2: false, 3: false, 4: false };
+    state.pendingStage ||= 0;
+    state.trialCooldownUntil ||= 0;
+    state.seenFinal ||= false;
+    state.endingState ||= { sweet: 0, silly: 0, brave: 0, choices: [] };
+    state.endingState.choices ||= [];
   } catch {}
 }
 
@@ -151,23 +185,104 @@ function setMood(newMood, opts = { persist: true }) {
   renderHUD();
 }
 
-function recomputeStage() {
-  // Stage 1: <150, Stage 2: 150-499, Stage 3: 500-999, Stage 4: 1000+
-  const a = state.affection || 0;
+/***********************
+  ✅ NEW: Stage gating + Final ending trigger helpers
+************************/
+function computeStageFromAffection(a) {
   let newStage = 1;
-  if (a >= 150) newStage = 2;
-  if (a >= 500) newStage = 3;
-  if (a >= 1000) newStage = 4;
+  if (a >= STAGE_THRESHOLDS[2]) newStage = 2;
+  if (a >= STAGE_THRESHOLDS[3]) newStage = 3;
+  if (a >= STAGE_THRESHOLDS[4]) newStage = 4;
+  return clampStage(newStage);
+}
 
-  newStage = clampStage(newStage);
-  if (newStage !== state.stage) {
-    state.stage = newStage;
+function maybeStartTrialForStage(desiredStage) {
+  if (isTrialRunning || isEndingRunning || isMiniGameRunning) return false;
+
+  const now = Date.now();
+  if ((state.trialCooldownUntil || 0) > now) return false;
+
+  for (const s of [2, 3, 4]) {
+    if (desiredStage >= s && !state.stageTrialPassed?.[s]) {
+      state.pendingStage = s;
+      save();
+      startStageTrial(s);
+      return true;
+    }
+  }
+  return false;
+}
+
+function finalizeStageIfEligible() {
+  const a = state.affection || 0;
+  const desiredStage = computeStageFromAffection(a);
+
+  // If missing any required trial, keep stage from jumping forward
+  const shouldHold =
+    (desiredStage >= 2 && !state.stageTrialPassed[2]) ||
+    (desiredStage >= 3 && !state.stageTrialPassed[3]) ||
+    (desiredStage >= 4 && !state.stageTrialPassed[4]);
+
+  if (shouldHold) {
+    const highestPassed =
+      state.stageTrialPassed[4] ? 4 :
+      state.stageTrialPassed[3] ? 3 :
+      state.stageTrialPassed[2] ? 2 : 1;
+
+    // Keep stage at highest passed stage (or 1)
+    const safeStage = clampStage(Math.min(desiredStage, highestPassed));
+    if (safeStage !== state.stage) {
+      state.stage = safeStage;
+      state.mood = "neutral";
+    }
+    updateSprite();
+    save();
+    renderHUD();
+
+    // try starting the next missing trial
+    maybeStartTrialForStage(desiredStage);
+    return;
+  }
+
+  // all required trials passed for desired stage
+  if (desiredStage !== state.stage) {
+    state.stage = desiredStage;
     state.mood = "neutral";
   }
 
   updateSprite();
   save();
   renderHUD();
+}
+
+function markTrialPassed(stageNum) {
+  state.stageTrialPassed[stageNum] = true;
+  state.pendingStage = 0;
+
+  // If affection supports it, evolve now
+  const desired = computeStageFromAffection(state.affection || 0);
+  if (desired >= stageNum) state.stage = stageNum;
+
+  state.mood = "neutral";
+  updateSprite();
+  save();
+  renderHUD();
+}
+
+function checkFinalTrigger() {
+  if (isEndingRunning || isTrialRunning || isMiniGameRunning) return;
+  if (state.seenFinal) return;
+  if ((state.affection || 0) >= FINAL_THRESHOLD) {
+    state.seenFinal = true;
+    save();
+    startFinalEndingVN();
+  }
+}
+
+function recomputeStage() {
+  // ✅ REPLACED stage jump logic with gated evolution
+  finalizeStageIfEligible();
+  checkFinalTrigger();
 }
 
 function addRewards(heartsEarned, affectionEarned) {
@@ -266,7 +381,8 @@ const POPUPS = [
 ];
 
 function maybePopup(context = "any") {
-  if (isMiniGameRunning) return;
+  // ✅ NEW: block during mini-games / trials / endings
+  if (isMiniGameRunning || isTrialRunning || isEndingRunning) return;
 
   if (state.popupCooldown > 0) {
     state.popupCooldown -= 1;
@@ -785,8 +901,14 @@ $("btnQuitGame").addEventListener("click", () => {
   if (stopCurrentGame) stopCurrentGame();
   stopCurrentGame = null;
 
-  isMiniGameRunning = false;
+  // ✅ if quitting a trial, don't instantly retrigger in a loop
+  if (isTrialRunning) state.trialCooldownUntil = Date.now() + 3000;
 
+  isMiniGameRunning = false;
+  isTrialRunning = false;
+  isEndingRunning = false;
+
+  save();
   showView("minigames");
 });
 
@@ -1509,6 +1631,979 @@ function gameDino(root) {
   };
 
   requestAnimationFrame(loop);
+}
+
+/***********************
+  ✅ NEW: STAGE TRIALS (pass/fail)
+************************/
+function startStageTrial(stageNum) {
+  touchAction();
+  isTrialRunning = true;
+  isMiniGameRunning = false;
+  isEndingRunning = false;
+
+  showView("game");
+  const area = $("gameArea");
+  area.innerHTML = "";
+  stopCurrentGame = null;
+
+  if (stageNum === 2) return trialDakgalbi(area);
+  if (stageNum === 3) return trialPinball(area);
+  if (stageNum === 4) return trialStarBeat(area);
+}
+
+function trialHeaderHTML(title, subtitle) {
+  return `
+    <div class="game-frame">
+      <div class="row">
+        <div><strong>${title}</strong> <span class="small" style="opacity:.85;">${subtitle}</span></div>
+        <div class="small">Trial required to evolve</div>
+      </div>
+      <div class="small" style="margin-top:8px; opacity:.9;">Fail = retry anytime. Quit button also works.</div>
+      <div style="height:10px;"></div>
+    </div>
+  `;
+}
+
+/* Stage 2 Trial: Make Perfect Dakgalbi (timing) */
+function trialDakgalbi(root) {
+  $("gameTitle").innerText = "🍲 Stage 2 Trial: Make Perfect Dakgalbi";
+
+  root.innerHTML = `
+    ${trialHeaderHTML("Make Perfect Dakgalbi", "Click when the marker is inside the pink zone")}
+    <div class="game-frame">
+      <div class="row">
+        <div>Steps: <strong id="dakStep">1</strong>/3</div>
+        <div>Perfect: <strong id="dakPerfect">0</strong></div>
+      </div>
+
+      <div class="small" style="margin-top:10px; white-space:pre-line;" id="dakInstr"></div>
+
+      <div style="margin-top:14px; padding:12px; border-radius:14px; border:1px solid rgba(255,77,136,.25); background:rgba(255,255,255,.65);">
+        <div style="position:relative; height:18px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden;">
+          <div id="dakZone" style="position:absolute; top:0; bottom:0; left:40%; width:18%; background:rgba(255,77,136,.35);"></div>
+          <div id="dakMarker" style="position:absolute; top:-5px; width:4px; height:28px; background:rgba(255,77,136,.95); left:0%;"></div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="dakHit">CLICK NOW</button>
+          <div class="small" id="dakMsg"></div>
+        </div>
+      </div>
+
+      <div class="center small" style="margin-top:10px;" id="dakEnd"></div>
+    </div>
+  `;
+
+  const instr = $("dakInstr");
+  const msg = $("dakMsg");
+  const endEl = $("dakEnd");
+  const marker = $("dakMarker");
+  const zone = $("dakZone");
+  const hitBtn = $("dakHit");
+
+  const steps = [
+    "Step 1: Add chicken at the perfect moment.\n(Click when the marker is inside the pink zone.)",
+    "Step 2: Add sauce when it's glossy.\n(Click inside the zone.)",
+    "Step 3: Stir and finish.\n(Click inside the zone.)"
+  ];
+
+  let running = true;
+  let step = 1;
+  let perfect = 0;
+
+  // marker animation
+  let t = 0;
+  let dir = 1;
+  let raf = null;
+
+  function randomizeZone() {
+    const left = 18 + Math.random() * 52; // 18..70
+    const width = 14 + Math.random() * 14; // 14..28
+    zone.style.left = `${left}%`;
+    zone.style.width = `${width}%`;
+  }
+
+  function setStepUI() {
+    $("dakStep").innerText = String(step);
+    $("dakPerfect").innerText = String(perfect);
+    instr.innerText = steps[step - 1];
+    msg.innerText = "";
+    endEl.innerText = "";
+  }
+
+  function loop() {
+    if (!running) return;
+
+    t += 0.018 * dir;
+    if (t >= 1) { t = 1; dir = -1; }
+    if (t <= 0) { t = 0; dir = 1; }
+
+    // ease for nicer movement
+    const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    marker.style.left = `${eased * 100}%`;
+
+    raf = requestAnimationFrame(loop);
+  }
+
+  function withinZone() {
+    const left = parseFloat(zone.style.left);
+    const width = parseFloat(zone.style.width);
+    const markerLeft = parseFloat(marker.style.left);
+    return markerLeft >= left && markerLeft <= (left + width);
+  }
+
+  function resolveHit() {
+    touchAction();
+    if (!running) return;
+
+    if (withinZone()) {
+      perfect += 1;
+      msg.innerText = "Perfect! 💗";
+    } else {
+      msg.innerText = "Not quite… 😭";
+    }
+
+    $("dakPerfect").innerText = String(perfect);
+
+    step += 1;
+    if (step <= 3) {
+      randomizeZone();
+      setStepUI();
+    } else {
+      finish();
+    }
+  }
+
+  function finish() {
+    running = false;
+    isTrialRunning = false;
+
+    if (raf) cancelAnimationFrame(raf);
+
+    const passed = perfect >= 2;
+    if (passed) {
+      markTrialPassed(2);
+      setMood("happy", { persist: true });
+      speak("Minyoung: “This dakgalbi… tastes like devotion.”");
+      endEl.innerText = "✅ Trial Passed! Stage 2 unlocked.";
+      // small reward for passing (optional but cute)
+      addRewards(10, 8);
+    } else {
+      speak("Minyoung: “It’s okay… we can retry. But I’m judging a little.”");
+      endEl.innerText = "❌ Trial Failed. You can retry anytime (earn more affection or just keep playing).";
+      // cool down so it doesn't instantly pop again
+      state.trialCooldownUntil = Date.now() + 4000;
+      save();
+    }
+
+    maybePopup("afterGame");
+  }
+
+  hitBtn.addEventListener("click", resolveHit);
+
+  stopCurrentGame = () => {
+    running = false;
+    isTrialRunning = false;
+    if (raf) cancelAnimationFrame(raf);
+  };
+
+  randomizeZone();
+  setStepUI();
+  loop();
+}
+
+/* Stage 3 Trial: Pixel Space Pinball (with aliendog.png) */
+function trialPinball(root) {
+  $("gameTitle").innerText = "🛸 Stage 3 Trial: Space Pinball";
+
+  root.innerHTML = `
+    ${trialHeaderHTML("Pixel Space Pinball", "Reach 650 points before time runs out")}
+    <div class="game-frame">
+      <div class="row">
+        <div>Controls: <span class="kbd">Z</span> (left) <span class="kbd">/</span> <span class="kbd">/</span> <span class="kbd">/</span> <span class="kbd">M</span> (right)</div>
+        <div>Score: <strong id="pbScore">0</strong> • Time: <strong id="pbTime">45</strong>s</div>
+      </div>
+      <canvas class="canvas" id="pbCanvas" width="720" height="360"></canvas>
+      <div class="center small" style="margin-top:10px;" id="pbMsg"></div>
+    </div>
+  `;
+
+  const canvas = $("pbCanvas");
+  const ctx = canvas.getContext("2d");
+  const scoreEl = $("pbScore");
+  const timeEl = $("pbTime");
+  const msg = $("pbMsg");
+
+  let running = true;
+  let last = performance.now();
+  let tLeft = 45;
+  let score = 0;
+
+  // pixel vibe
+  ctx.imageSmoothingEnabled = false;
+
+  const ball = { x: 360, y: 120, vx: 120, vy: 40, r: 6 };
+  const gravity = 320;
+
+  const leftPaddle = { x: 230, y: 320, w: 90, h: 10, angle: 0, pressed: false };
+  const rightPaddle = { x: 400, y: 320, w: 90, h: 10, angle: 0, pressed: false };
+
+  const bumpers = [
+    { x: 220, y: 120, r: 18, val: 120 },
+    { x: 360, y: 80, r: 18, val: 120 },
+    { x: 500, y: 120, r: 18, val: 120 },
+    { x: 300, y: 170, r: 14, val: 80 },
+    { x: 420, y: 170, r: 14, val: 80 }
+  ];
+
+  const stars = [];
+  function spawnStarTargets() {
+    stars.length = 0;
+    for (let i = 0; i < 6; i++) {
+      stars.push({
+        x: 80 + Math.random() * 560,
+        y: 40 + Math.random() * 180,
+        r: 8,
+        hit: false
+      });
+    }
+  }
+
+  const dog = new Image();
+  dog.src = ALIENDOG_SRC;
+  let dogT = 0;
+
+  function drawBG() {
+    ctx.fillStyle = "rgba(255,255,255,.75)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // pixel stars
+    ctx.fillStyle = "rgba(0,0,0,.12)";
+    for (let i = 0; i < 120; i++) {
+      const x = (i * 37) % canvas.width;
+      const y = (i * 91) % canvas.height;
+      ctx.fillRect(x, y, 2, 2);
+    }
+
+    // galaxy band
+    ctx.fillStyle = "rgba(255,77,136,.08)";
+    ctx.fillRect(0, 90, canvas.width, 70);
+  }
+
+  function drawPaddles() {
+    const lift = 18;
+    // left
+    ctx.fillStyle = "rgba(255,77,136,.9)";
+    ctx.fillRect(leftPaddle.x, leftPaddle.y - (leftPaddle.pressed ? lift : 0), leftPaddle.w, leftPaddle.h);
+    // right
+    ctx.fillRect(rightPaddle.x, rightPaddle.y - (rightPaddle.pressed ? lift : 0), rightPaddle.w, rightPaddle.h);
+
+    // side rails
+    ctx.fillStyle = "rgba(0,0,0,.12)";
+    ctx.fillRect(0, 0, 6, canvas.height);
+    ctx.fillRect(canvas.width - 6, 0, 6, canvas.height);
+    ctx.fillRect(0, canvas.height - 6, canvas.width, 6);
+  }
+
+  function drawBall() {
+    ctx.fillStyle = "rgba(255,77,136,.95)";
+    ctx.fillRect(ball.x - ball.r, ball.y - ball.r, ball.r * 2, ball.r * 2);
+    ctx.fillStyle = "rgba(0,0,0,.18)";
+    ctx.fillRect(ball.x - ball.r, ball.y - ball.r, 2, 2);
+  }
+
+  function drawBumpers() {
+    bumpers.forEach((b) => {
+      ctx.fillStyle = "rgba(255,77,136,.25)";
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(255,77,136,.55)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+  }
+
+  function drawStars() {
+    stars.forEach((s) => {
+      ctx.fillStyle = s.hit ? "rgba(0,0,0,.10)" : "rgba(255,77,136,.35)";
+      ctx.fillRect(s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+      if (!s.hit) {
+        ctx.fillStyle = "rgba(255,77,136,.9)";
+        ctx.fillRect(s.x - 2, s.y - 10, 4, 20);
+        ctx.fillRect(s.x - 10, s.y - 2, 20, 4);
+      }
+    });
+  }
+
+  function drawDog(dt) {
+    dogT += dt;
+    const dx = 70 + Math.sin(dogT * 0.8) * 28;
+    const dy = 220 + Math.cos(dogT * 1.1) * 18;
+
+    if (dog.complete && dog.naturalWidth > 0) {
+      ctx.globalAlpha = 0.9;
+      ctx.drawImage(dog, dx, dy, 72, 72);
+      ctx.globalAlpha = 1;
+    } else {
+      // fallback if image missing
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = "rgba(0,0,0,.10)";
+      ctx.fillRect(dx, dy, 72, 72);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "rgba(255,77,136,.9)";
+      ctx.fillText("🐶👽", dx + 10, dy + 40);
+    }
+  }
+
+  function reflectBall(nx, ny, boost = 1.0) {
+    // reflect velocity around normal
+    const dot = ball.vx * nx + ball.vy * ny;
+    ball.vx = (ball.vx - 2 * dot * nx) * boost;
+    ball.vy = (ball.vy - 2 * dot * ny) * boost;
+  }
+
+  function collideWalls() {
+    // left/right
+    if (ball.x - ball.r < 6) {
+      ball.x = 6 + ball.r;
+      ball.vx = Math.abs(ball.vx);
+    }
+    if (ball.x + ball.r > canvas.width - 6) {
+      ball.x = canvas.width - 6 - ball.r;
+      ball.vx = -Math.abs(ball.vx);
+    }
+    // top
+    if (ball.y - ball.r < 6) {
+      ball.y = 6 + ball.r;
+      ball.vy = Math.abs(ball.vy);
+    }
+  }
+
+  function collideBumpers() {
+    bumpers.forEach((b) => {
+      const dx = ball.x - b.x;
+      const dy = ball.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < ball.r + b.r) {
+        const nx = dx / (dist || 1);
+        const ny = dy / (dist || 1);
+        ball.x = b.x + nx * (ball.r + b.r + 0.5);
+        ball.y = b.y + ny * (ball.r + b.r + 0.5);
+        reflectBall(nx, ny, 1.08);
+        score += b.val;
+      }
+    });
+  }
+
+  function collideStars() {
+    stars.forEach((s) => {
+      if (s.hit) return;
+      const dx = ball.x - s.x;
+      const dy = ball.y - s.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < ball.r + s.r + 2) {
+        s.hit = true;
+        score += 60;
+        // tiny bounce
+        ball.vy = -Math.abs(ball.vy) * 0.95;
+      }
+    });
+
+    // combo bonus if all hit
+    if (stars.length && stars.every((s) => s.hit)) {
+      score += 150;
+      spawnStarTargets();
+      msg.innerText = "✨ Combo! New star targets spawned.";
+    }
+  }
+
+  function collidePaddles() {
+    const lift = 18;
+
+    const lpY = leftPaddle.y - (leftPaddle.pressed ? lift : 0);
+    const rpY = rightPaddle.y - (rightPaddle.pressed ? lift : 0);
+
+    // left paddle AABB
+    if (
+      ball.x > leftPaddle.x &&
+      ball.x < leftPaddle.x + leftPaddle.w &&
+      ball.y + ball.r > lpY &&
+      ball.y - ball.r < lpY + leftPaddle.h &&
+      ball.vy > 0
+    ) {
+      ball.y = lpY - ball.r - 0.5;
+      ball.vy = -Math.abs(ball.vy) * (leftPaddle.pressed ? 1.12 : 1.0);
+      // slight aim based on hit position
+      const hit = (ball.x - (leftPaddle.x + leftPaddle.w / 2)) / (leftPaddle.w / 2);
+      ball.vx += hit * 80;
+      score += leftPaddle.pressed ? 25 : 10;
+    }
+
+    // right paddle AABB
+    if (
+      ball.x > rightPaddle.x &&
+      ball.x < rightPaddle.x + rightPaddle.w &&
+      ball.y + ball.r > rpY &&
+      ball.y - ball.r < rpY + rightPaddle.h &&
+      ball.vy > 0
+    ) {
+      ball.y = rpY - ball.r - 0.5;
+      ball.vy = -Math.abs(ball.vy) * (rightPaddle.pressed ? 1.12 : 1.0);
+      const hit = (ball.x - (rightPaddle.x + rightPaddle.w / 2)) / (rightPaddle.w / 2);
+      ball.vx += hit * 80;
+      score += rightPaddle.pressed ? 25 : 10;
+    }
+  }
+
+  function end(passed) {
+    running = false;
+    isTrialRunning = false;
+    cleanup();
+
+    if (passed) {
+      markTrialPassed(3);
+      setMood("happy", { persist: true });
+      speak("Minyoung: “Okay... that was actually cute. Space pinball boyfriend energy.”");
+      msg.innerText = "✅ Trial Passed! Stage 3 unlocked.";
+      addRewards(14, 12);
+    } else {
+      speak("Minyoung: “One more run. The alien dog believes in you.”");
+      msg.innerText = "❌ Trial Failed. Retry anytime.";
+      state.trialCooldownUntil = Date.now() + 4000;
+      save();
+    }
+
+    maybePopup("afterGame");
+  }
+
+  function loop(now) {
+    if (!running) return;
+    const dt = (now - last) / 1000;
+    last = now;
+
+    tLeft -= dt;
+    timeEl.innerText = String(Math.max(0, Math.ceil(tLeft)));
+
+    // physics
+    ball.vy += gravity * dt;
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // mild damping to keep things sane
+    ball.vx *= 0.999;
+    ball.vy *= 0.999;
+
+    collideWalls();
+    collideBumpers();
+    collideStars();
+    collidePaddles();
+
+    // bottom drain
+    if (ball.y - ball.r > canvas.height + 20) {
+      // respawn but lose points
+      ball.x = 360;
+      ball.y = 120;
+      ball.vx = 120 * (Math.random() < 0.5 ? 1 : -1);
+      ball.vy = 60;
+      score = Math.max(0, score - 120);
+      msg.innerText = "Drain! The galaxy giggled.";
+    }
+
+    // draw
+    drawBG();
+    drawStars();
+    drawBumpers();
+    drawDog(dt);
+    drawPaddles();
+    drawBall();
+
+    scoreEl.innerText = String(score);
+
+    if (score >= 650) return end(true);
+    if (tLeft <= 0) return end(false);
+
+    requestAnimationFrame(loop);
+  }
+
+  function onKeyDown(e) {
+    touchAction();
+    const k = e.key.toLowerCase();
+    if (k === "z") leftPaddle.pressed = true;
+    if (k === "m") rightPaddle.pressed = true;
+  }
+  function onKeyUp(e) {
+    const k = e.key.toLowerCase();
+    if (k === "z") leftPaddle.pressed = false;
+    if (k === "m") rightPaddle.pressed = false;
+  }
+
+  function cleanup() {
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+  }
+
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+
+  stopCurrentGame = () => {
+    running = false;
+    isTrialRunning = false;
+    cleanup();
+  };
+
+  spawnStarTargets();
+  requestAnimationFrame(loop);
+}
+
+/* Stage 4 Trial: Star Beat Rhythm */
+function trialStarBeat(root) {
+  $("gameTitle").innerText = "🌟 Stage 4 Trial: Star Beat Confession";
+
+  root.innerHTML = `
+    ${trialHeaderHTML("Star Beat Confession", "Hit the right arrow key on beat")}
+    <div class="game-frame">
+      <div class="row">
+        <div>Keys: <span class="kbd">←</span> <span class="kbd">↑</span> <span class="kbd">→</span> <span class="kbd">↓</span></div>
+        <div>Accuracy: <strong id="sbAcc">0</strong>% • Notes: <strong id="sbNote">0</strong>/20</div>
+      </div>
+
+      <div style="margin-top:12px; border-radius:14px; border:1px solid rgba(255,77,136,.25); background:rgba(255,255,255,.7); padding:12px;">
+        <div style="position:relative; height:28px; border-radius:999px; background:rgba(0,0,0,.08); overflow:hidden;">
+          <div style="position:absolute; top:0; bottom:0; left:48%; width:4%; background:rgba(255,77,136,.35);"></div>
+          <div id="sbRunner" style="position:absolute; top:0; bottom:0; left:0%; width:3%; background:rgba(255,77,136,.9);"></div>
+        </div>
+
+        <div class="center" style="margin-top:10px; font-size:34px;" id="sbPrompt">⬅️</div>
+        <div class="center small" id="sbMsg" style="margin-top:6px;"></div>
+      </div>
+
+      <div class="center small" style="margin-top:10px;" id="sbEnd"></div>
+    </div>
+  `;
+
+  const runner = $("sbRunner");
+  const promptEl = $("sbPrompt");
+  const msg = $("sbMsg");
+  const accEl = $("sbAcc");
+  const noteEl = $("sbNote");
+  const endEl = $("sbEnd");
+
+  const prompts = ["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"];
+  const promptEmoji = { ArrowLeft: "⬅️", ArrowUp: "⬆️", ArrowRight: "➡️", ArrowDown: "⬇️" };
+
+  let running = true;
+  let note = 0;
+  let hits = 0;
+
+  // beat settings
+  const totalNotes = 20;
+  const beatMs = 900;
+  const windowPerfect = 90;   // ms
+  const windowGood = 160;     // ms
+
+  let beatStart = performance.now();
+  let current = prompts[Math.floor(Math.random() * prompts.length)];
+
+  function newNote(now) {
+    beatStart = now;
+    current = prompts[Math.floor(Math.random() * prompts.length)];
+    promptEl.innerText = promptEmoji[current];
+    msg.innerText = "Ready…";
+    noteEl.innerText = `${note}/${totalNotes}`;
+  }
+
+  function setAcc() {
+    const acc = note === 0 ? 0 : Math.round((hits / note) * 100);
+    accEl.innerText = String(acc);
+  }
+
+  function finish() {
+    running = false;
+    isTrialRunning = false;
+    window.removeEventListener("keydown", onKey);
+
+    const acc = note === 0 ? 0 : Math.round((hits / note) * 100);
+    const passed = acc >= 70;
+
+    if (passed) {
+      markTrialPassed(4);
+      setMood("happy", { persist: true });
+      speak("Minyoung: “Okay... you’re kind of perfect. Like... annoyingly.”");
+      endEl.innerText = "✅ Trial Passed! Stage 4 unlocked.";
+      addRewards(18, 16);
+    } else {
+      speak("Minyoung: “Retry. I want you to say it properly.”");
+      endEl.innerText = "❌ Trial Failed. Retry anytime.";
+      state.trialCooldownUntil = Date.now() + 4000;
+      save();
+    }
+
+    maybePopup("afterGame");
+  }
+
+  function onKey(e) {
+    if (!running) return;
+    if (!["ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown"].includes(e.key)) return;
+    touchAction();
+
+    const now = performance.now();
+    const delta = Math.abs(now - (beatStart + beatMs * 0.5)); // centered timing
+
+    if (e.key !== current) {
+      msg.innerText = "Wrong key 😭";
+      return;
+    }
+
+    if (delta <= windowPerfect) {
+      hits += 1;
+      msg.innerText = "Perfect 💗";
+    } else if (delta <= windowGood) {
+      hits += 0.7;
+      msg.innerText = "Good 😌";
+    } else {
+      msg.innerText = "Late/Early 😭";
+    }
+
+    note += 1;
+    setAcc();
+    noteEl.innerText = `${note}/${totalNotes}`;
+
+    if (note >= totalNotes) finish();
+    else newNote(now);
+  }
+
+  function loop() {
+    if (!running) return;
+
+    const now = performance.now();
+    const progress = ((now - beatStart) % beatMs) / beatMs; // 0..1
+    runner.style.left = `${progress * 100}%`;
+
+    if (now - beatStart > beatMs) {
+      // missed note
+      beatStart = now;
+      msg.innerText = "Miss… 🥺";
+      note += 1;
+      setAcc();
+      noteEl.innerText = `${note}/${totalNotes}`;
+      current = prompts[Math.floor(Math.random() * prompts.length)];
+      promptEl.innerText = promptEmoji[current];
+
+      if (note >= totalNotes) finish();
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener("keydown", onKey);
+
+  stopCurrentGame = () => {
+    running = false;
+    isTrialRunning = false;
+    window.removeEventListener("keydown", onKey);
+  };
+
+  // start
+  newNote(performance.now());
+  requestAnimationFrame(loop);
+}
+
+/***********************
+  ✅ NEW: FINAL ENDING (Dating VN) at affection >= 1111
+************************/
+function startFinalEndingVN() {
+  touchAction();
+
+  isEndingRunning = true;
+  isTrialRunning = false;
+  isMiniGameRunning = false;
+
+  showView("game");
+  const area = $("gameArea");
+  area.innerHTML = "";
+  stopCurrentGame = null;
+
+  $("gameTitle").innerText = "💫 Final Trial: The Ending";
+
+  const es = state.endingState || { sweet: 0, silly: 0, brave: 0, choices: [] };
+  es.choices ||= [];
+  state.endingState = es;
+  save();
+
+  function addStat(key, amt, label) {
+    es[key] = (es[key] || 0) + amt;
+    es.choices.push(label);
+    save();
+  }
+
+  function renderScene(scene) {
+    const spriteRow = `
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:10px;">
+        <img src="assets/characters/stage1-neutral.png?v=${SPRITE_VERSION}" style="width:52px; height:60px; image-rendering:pixelated; opacity:.9;" />
+        <img src="assets/characters/stage2-neutral.png?v=${SPRITE_VERSION}" style="width:52px; height:60px; image-rendering:pixelated; opacity:.9;" />
+        <img src="assets/characters/stage3-neutral.png?v=${SPRITE_VERSION}" style="width:52px; height:60px; image-rendering:pixelated; opacity:.9;" />
+        <img src="assets/characters/stage4-neutral.png?v=${SPRITE_VERSION}" style="width:52px; height:60px; image-rendering:pixelated; opacity:.9;" />
+        <img src="${ALIENDOG_SRC}" style="width:60px; height:60px; image-rendering:pixelated; opacity:.95; border-radius:10px;" />
+      </div>
+    `;
+
+    area.innerHTML = `
+      <div class="game-frame">
+        <div class="row">
+          <div><strong>${scene.title}</strong></div>
+          <div class="small">Affection: ${state.affection} / ${FINAL_THRESHOLD}</div>
+        </div>
+        <div class="small" style="margin-top:10px; white-space:pre-line;">${scene.text}</div>
+        ${spriteRow}
+        <div id="vnChoices" style="display:flex; flex-direction:column; gap:10px; margin-top:14px;"></div>
+        <div class="center small" style="margin-top:10px; opacity:.9;" id="vnHint"></div>
+      </div>
+    `;
+
+    const choices = $("vnChoices");
+    const hint = $("vnHint");
+
+    scene.choices.forEach((c) => {
+      const btn = document.createElement("button");
+      btn.className = "btn";
+      btn.innerText = c.label;
+      btn.addEventListener("click", () => {
+        touchAction();
+        if (c.onPick) c.onPick();
+        if (c.next) renderScene(c.next());
+      });
+      choices.appendChild(btn);
+    });
+
+    hint.innerText = scene.hint || "";
+  }
+
+  function endingScene() {
+    const sweet = es.sweet || 0;
+    const silly = es.silly || 0;
+    const brave = es.brave || 0;
+
+    // Determine ending
+    let endingKey = "true";
+    if (silly >= sweet && silly >= brave) endingKey = "alien";
+    else if (brave >= sweet && brave >= silly) endingKey = "cosmic";
+    else endingKey = "true";
+
+    // spice: if they own certain items, nudge
+    if (state.flags.tornadoFudge && silly >= 3) endingKey = "alien";
+    if (state.flags.perfume && sweet >= 3) endingKey = "true";
+    if (state.flags.goofyNate && silly >= 2) endingKey = "alien";
+
+    const endings = {
+      true: {
+        title: "TRUE ENDING: The Softest Universe",
+        text:
+`Minyoung looks at you like she’s memorizing you on purpose.
+Not the highlight version. Not the brave version.
+Just… you.
+
+Somewhere in the background, every stage of her life is cheering quietly.
+Even the tiny angry one. Even the sleepy one.
+
+She says:
+“Okay. Stay. Like… forever.” 💗`,
+        mood: "happy",
+        reward: { hearts: 111, affection: 0 }
+      },
+      cosmic: {
+        title: "COSMIC ENDING: Star Map Partners",
+        text:
+`You and Minyoung don’t chase perfect.
+You chase honest.
+
+Together you build a tiny star map of your days:
+Food, laughter, quiet, ridiculous games, and the kind of love that doesn’t ask permission.
+
+Minyoung says:
+“If we get lost, we’ll just… make a new path.” ✨`,
+        mood: "happy",
+        reward: { hearts: 88, affection: 0 }
+      },
+      alien: {
+        title: "ALIEN DOG ENDING: Approved by the Galaxy",
+        text:
+`The alien dog floats into frame like a referee.
+It spins. It barks once. It declares:
+
+“Certified Couple.”
+
+Minyoung laughs so hard she hides her face, and then she grabs your hand like it’s the obvious thing.
+
+She says:
+“I hate you. I love you. Do it again.” 👽🐶💗`,
+        mood: "happy",
+        reward: { hearts: 99, affection: 0 }
+      }
+    };
+
+    const pick = endings[endingKey];
+
+    return {
+      title: pick.title,
+      text: pick.text + `\n\n(Your path stats: sweet ${sweet}, silly ${silly}, brave ${brave})`,
+      hint: "You can quit anytime. This ending is saved once triggered.",
+      choices: [
+        {
+          label: "Collect ending reward 💗",
+          onPick: () => {
+            addRewards(pick.reward.hearts, pick.reward.affection);
+            setMood(pick.mood, { persist: true });
+            speak("Minyoung: “Okay… that was cute. Screenshot this.”");
+          },
+          next: () => ({
+            title: "THE END",
+            text:
+`You reached the ending.
+Minyoung is still here.
+The universe is still taking notes… but now it’s smiling.`,
+            choices: [
+              {
+                label: "Back to mini games",
+                onPick: () => {
+                  isEndingRunning = false;
+                  save();
+                  showView("minigames");
+                }
+              }
+            ]
+          })
+        }
+      ]
+    };
+  }
+
+  // Scenes
+  const scene1 = {
+    title: "Scene 1: The Doorway Moment",
+    text:
+`Affection hit 1111.
+The world pauses for one second like it’s waiting for your move.
+
+Minyoung looks at you.
+Her expression says: “Explain yourself.”`,
+    choices: [
+      {
+        label: "Offer food first. Always food.",
+        onPick: () => addStat("sweet", 2, "food-first"),
+        next: () => scene2
+      },
+      {
+        label: "Do a stupid dramatic bow. Full cringe.",
+        onPick: () => addStat("silly", 2, "dramatic-bow"),
+        next: () => scene2
+      },
+      {
+        label: "Say the honest thing, even if it's scary.",
+        onPick: () => addStat("brave", 2, "honest-first"),
+        next: () => scene2
+      }
+    ],
+    hint: "Your choices shape the ending path."
+  };
+
+  const scene2 = {
+    title: "Scene 2: The Dakgalbi Memory",
+    text:
+`The air smells like something you made together.
+Not perfect, but real.
+
+Minyoung says:
+“Do you remember the first time you tried?”`,
+    choices: [
+      {
+        label: "Admit you were terrified of messing up.",
+        onPick: () => addStat("brave", 1, "admit-fear"),
+        next: () => scene3
+      },
+      {
+        label: "Say: “I just wanted you to be full.”",
+        onPick: () => addStat("sweet", 1, "wanted-full"),
+        next: () => scene3
+      },
+      {
+        label: "Say: “I was focusing on not crying in front of the chicken.”",
+        onPick: () => addStat("silly", 1, "crying-chicken"),
+        next: () => scene3
+      }
+    ]
+  };
+
+  const scene3 = {
+    title: "Scene 3: Space Arcade Date",
+    text:
+`The arcade lights blink like little galaxies.
+A pinball machine hums.
+The alien dog floats by like it owns the place.
+
+Minyoung nudges you:
+“Okay. What are we doing?”`,
+    choices: [
+      {
+        label: "Challenge her to pinball. Winner chooses dessert.",
+        onPick: () => addStat("silly", 1, "dessert-duel"),
+        next: () => scene4
+      },
+      {
+        label: "Quietly hold her hand and match her pace.",
+        onPick: () => addStat("sweet", 1, "hold-hand"),
+        next: () => scene4
+      },
+      {
+        label: "Ask her what she wants, and mean it.",
+        onPick: () => addStat("brave", 1, "ask-mean-it"),
+        next: () => scene4
+      }
+    ]
+  };
+
+  const scene4 = {
+    title: "Scene 4: The Confession Prompt",
+    text:
+`You get one line.
+Not the clever one.
+Not the perfect one.
+
+Just the one that’s true.`,
+    choices: [
+      {
+        label: "“I like being your safe place.”",
+        onPick: () => addStat("sweet", 2, "safe-place"),
+        next: () => endingScene()
+      },
+      {
+        label: "“I’m going to keep choosing you.”",
+        onPick: () => addStat("brave", 2, "keep-choosing"),
+        next: () => endingScene()
+      },
+      {
+        label: "“I’m scared, but I want this forever.”",
+        onPick: () => addStat("brave", 2, "scared-forever"),
+        next: () => endingScene()
+      },
+      {
+        label: "“If we’re aliens, we’re a matched set.”",
+        onPick: () => addStat("silly", 2, "matched-aliens"),
+        next: () => endingScene()
+      }
+    ]
+  };
+
+  stopCurrentGame = () => {
+    // allow quitting out cleanly
+    isEndingRunning = false;
+    save();
+  };
+
+  setMood("neutral", { persist: true });
+  speak("Minyoung: “Okay. Final trial. Don’t be weird.”");
+  renderScene(scene1);
 }
 
 /***********************
