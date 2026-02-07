@@ -1,4 +1,4 @@
-/* game.js (FULL) */
+/* game.js (FULL)
 /***********************
   Minyoung Maker (Stages 1–4)
   - 5 mini games: catch, pop, memory, react, dino
@@ -14,6 +14,12 @@
     - No restart button on fail (they can retry by accepting entry later)
     - Random popups NEVER fire during mini-games/trials/ending
     - Final ending triggers at affection >= 1111, also with entry popup
+  - DEV CHEATS (NEW):
+    - Press Ctrl+Shift+L anywhere (outside games) to open a cheat menu:
+      • Unlimited Hearts
+      • Unlimited Affection
+      • Jump to a specific Stage Trial (2/3/4)
+      • Quick affection set + pass/clear trials
 ************************/
 
 const $ = (id) => document.getElementById(id);
@@ -54,6 +60,12 @@ const state = {
   pendingStage: null, // next stage trial to attempt (2/3/4)
   trialCooldownUntil: 0, // avoid instant re-prompt loops
   endingSeen: false,
+
+  // DEV CHEATS (persisted)
+  cheats: {
+    unlimitedHearts: false,
+    unlimitedAffection: false
+  },
 
   lastActionAt: Date.now()
 };
@@ -101,6 +113,8 @@ function load() {
     state.pendingStage ||= null;
     state.trialCooldownUntil ||= 0;
     state.endingSeen ||= false;
+
+    state.cheats ||= { unlimitedHearts: false, unlimitedAffection: false };
 
     state.lastActionAt ||= Date.now();
     state.stage = clampStage(state.stage || 1);
@@ -170,6 +184,156 @@ function setMood(newMood, opts = { persist: true }) {
 }
 
 /***********************
+  DEV CHEATS (helpers)
+************************/
+function enforceCheats() {
+  if (state.cheats?.unlimitedHearts) state.hearts = Math.max(state.hearts || 0, 999999);
+  if (state.cheats?.unlimitedAffection) state.affection = Math.max(state.affection || 0, 999999);
+  save();
+}
+function openCheatMenu() {
+  if (!canInterruptWithPopup()) return;
+
+  const modal = $("modal");
+  const actions = $("modalActions");
+  actions.innerHTML = "";
+
+  $("modalTitle").innerText = "🛠️ Dev Cheats";
+  $("modalText").innerText =
+    `Testing tools.\n\n` +
+    `Unlimited Hearts: ${state.cheats?.unlimitedHearts ? "ON" : "OFF"}\n` +
+    `Unlimited Affection: ${state.cheats?.unlimitedAffection ? "ON" : "OFF"}\n\n` +
+    `Tip: You can also jump into any stage trial directly.`;
+
+  function addBtn(label, onClick, ghost = false) {
+    const b = document.createElement("button");
+    b.className = ghost ? "btn ghost" : "btn";
+    b.innerText = label;
+    b.addEventListener("click", () => {
+      touchAction();
+      onClick?.();
+    });
+    actions.appendChild(b);
+  }
+
+  addBtn(
+    `Toggle Unlimited Hearts (${state.cheats?.unlimitedHearts ? "ON" : "OFF"})`,
+    () => {
+      state.cheats.unlimitedHearts = !state.cheats.unlimitedHearts;
+      enforceCheats();
+      renderHUD();
+      closePopup();
+      speak(state.cheats.unlimitedHearts ? "Cheat: Unlimited hearts enabled." : "Cheat: Unlimited hearts disabled.");
+    }
+  );
+
+  addBtn(
+    `Toggle Unlimited Affection (${state.cheats?.unlimitedAffection ? "ON" : "OFF"})`,
+    () => {
+      state.cheats.unlimitedAffection = !state.cheats.unlimitedAffection;
+      enforceCheats();
+      recomputeStage();
+      renderHUD();
+      closePopup();
+      speak(state.cheats.unlimitedAffection ? "Cheat: Unlimited affection enabled." : "Cheat: Unlimited affection disabled.");
+    }
+  );
+
+  addBtn("Add +500 hearts", () => {
+    state.hearts += 500;
+    enforceCheats();
+    renderHUD();
+    closePopup();
+    speak("Cheat: +500 hearts.");
+  });
+
+  addBtn("Add +500 affection", () => {
+    state.affection += 500;
+    enforceCheats();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: +500 affection.");
+  });
+
+  addBtn("Set affection to 150 (Stage 2 threshold)", () => {
+    state.affection = 150;
+    enforceCheats();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: affection set to 150.");
+  });
+
+  addBtn("Set affection to 500 (Stage 3 threshold)", () => {
+    state.affection = 500;
+    enforceCheats();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: affection set to 500.");
+  });
+
+  addBtn("Set affection to 1000 (Stage 4 threshold)", () => {
+    state.affection = 1000;
+    enforceCheats();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: affection set to 1000.");
+  });
+
+  addBtn("Set affection to 1111 (Ending threshold)", () => {
+    state.affection = 1111;
+    enforceCheats();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: affection set to 1111.");
+  });
+
+  addBtn("Start Stage 2 Trial now", () => {
+    state.trialCooldownUntil = 0;
+    closePopup();
+    promptTrialEntry(2);
+  });
+
+  addBtn("Start Stage 3 Trial now", () => {
+    state.trialCooldownUntil = 0;
+    closePopup();
+    promptTrialEntry(3);
+  });
+
+  addBtn("Start Stage 4 Trial now", () => {
+    state.trialCooldownUntil = 0;
+    closePopup();
+    promptTrialEntry(4);
+  });
+
+  addBtn("Mark ALL trials passed", () => {
+    state.stageTrialPassed[2] = true;
+    state.stageTrialPassed[3] = true;
+    state.stageTrialPassed[4] = true;
+    save();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: all trials marked as passed.");
+  });
+
+  addBtn("Clear trial passes", () => {
+    state.stageTrialPassed[2] = false;
+    state.stageTrialPassed[3] = false;
+    state.stageTrialPassed[4] = false;
+    save();
+    recomputeStage();
+    closePopup();
+    speak("Cheat: trial passes cleared.");
+  });
+
+  addBtn("Close", () => {
+    closePopup();
+    speak("Minyoung is watching you debug… 😑");
+  }, true);
+
+  modal.classList.remove("hidden");
+}
+
+/***********************
   Stage gating + trials + ending
 ************************/
 function desiredStageFromAffection(a) {
@@ -181,6 +345,8 @@ function desiredStageFromAffection(a) {
 }
 
 function recomputeStage() {
+  enforceCheats();
+
   const a = state.affection || 0;
   const desired = desiredStageFromAffection(a);
 
@@ -214,6 +380,7 @@ function addRewards(heartsEarned, affectionEarned) {
   const boosted = Math.round(affectionEarned * (state.affectionMult || 1));
   state.affection += boosted;
 
+  enforceCheats();
   save();
   recomputeStage();
   renderHUD();
@@ -239,13 +406,13 @@ function promptTrialEntry(stageNum) {
   const titleMap = {
     2: "🍲 Stage 2 Trial: Make Perfect Dakgalbi",
     3: "🛸 Stage 3 Trial: Pixel Space Pinball",
-    4: "🌟 Stage 4 Trial: Star Beat Confession"
+    4: "🎉 Stage 4 Trial: Minyoung Party"
   };
 
   const descMap = {
     2: "Time the heat perfectly. Pass to unlock Stage 2 evolution.",
     3: "Score points in pixel pinball. Pass to unlock Stage 3 evolution.",
-    4: "Hit the beats. Pass to unlock Stage 4 evolution."
+    4: "Survive the party. Pass to unlock Stage 4 evolution."
   };
 
   $("modalTitle").innerText = "⚠️ Evolution Trial";
@@ -375,7 +542,7 @@ function startStageTrial(stageNum) {
 
   if (stageNum === 2) return trialDakgalbi(area);
   if (stageNum === 3) return trialPinball(area);
-  if (stageNum === 4) return trialStarBeat(area);
+  if (stageNum === 4) return trialMinyoungParty(area);
 
   // fallback
   isTrialRunning = false;
@@ -822,6 +989,7 @@ function openPopup(popup) {
 
       setMood(finalMood, { persist: true });
 
+      enforceCheats();
       save();
       recomputeStage();
       renderHUD();
@@ -895,8 +1063,10 @@ function openItemPopup(item, affectionGained) {
   HUD
 ************************/
 function renderHUD() {
-  $("hearts").innerText = state.hearts;
-  $("affection").innerText = state.affection;
+  enforceCheats();
+
+  $("hearts").innerText = state.cheats?.unlimitedHearts ? "∞" : String(state.hearts);
+  $("affection").innerText = state.cheats?.unlimitedAffection ? "∞" : String(state.affection);
   $("stage").innerText = state.stage;
   $("mood").innerText = state.mood;
 
@@ -908,6 +1078,8 @@ function renderHUD() {
   if (state.flags.safeSleepy) passives.push("Forehead Blanket: Safe & Sleepy unlocked");
   if (state.flags.tornadoFudge) passives.push("Tornado Fudge: chaos memories boosted");
   if (state.flags.goofyNate) passives.push("Goofy Nate: happy outcomes boosted");
+  if (state.cheats?.unlimitedHearts) passives.push("DEV: Unlimited Hearts");
+  if (state.cheats?.unlimitedAffection) passives.push("DEV: Unlimited Affection");
   $("passivesNote").innerText = passives.join(" • ");
 
   const inv = $("inventoryList");
@@ -1207,12 +1379,14 @@ function buyItem(id) {
   const ownedUnique = item.unique && state.inventory.includes(item.name);
   if (ownedUnique) return;
 
-  if (state.hearts < item.cost) {
-    speak("Not enough hearts 😭 Go play mini games and come back.");
-    return;
+  // ✅ Unlimited hearts bypasses cost checks/deductions
+  if (!state.cheats?.unlimitedHearts) {
+    if (state.hearts < item.cost) {
+      speak("Not enough hearts 😭 Go play mini games and come back.");
+      return;
+    }
+    state.hearts -= item.cost;
   }
-
-  state.hearts -= item.cost;
 
   const hidden = item.affectionHidden ?? 0;
   const boosted = Math.round(hidden * (state.affectionMult || 1));
@@ -1224,6 +1398,7 @@ function buyItem(id) {
   setMood("happy", { persist: true });
   speak("Minyoung received a gift… and her mood instantly improved 💗");
 
+  enforceCheats();
   save();
   recomputeStage();
   renderHUD();
@@ -2468,131 +2643,161 @@ function trialPinball(root) {
 }
 
 /***********************
-  TRIAL 4: Star Beat (rhythm-ish)
+  TRIAL 4: Minyoung Party (cute graphics, competitive mean)
+  - Click GOOD items to earn points
+  - Avoid BAD items (they subtract points + make her mad)
+  - Survive timer + hit score threshold
 ************************/
-function trialStarBeat(root) {
-  $("gameTitle").innerText = "🌟 Trial: Star Beat Confession";
+function trialMinyoungParty(root) {
+  $("gameTitle").innerText = "🎉 Trial: Minyoung Party";
 
   root.innerHTML = `
     <div class="game-frame">
       <div class="row">
-        <div>Press <span class="kbd">Space</span> when the star is in the zone • 12 beats</div>
-        <div>Hits: <strong id="sbHits">0</strong>/12</div>
+        <div>Click good vibes • avoid mean vibes • 18 seconds</div>
+        <div>Score: <strong id="mpScore">0</strong></div>
       </div>
 
-      <canvas class="canvas" id="sbCanvas" width="720" height="360"></canvas>
-      <div class="center small" style="margin-top:10px;" id="sbMsg"></div>
+      <div class="small" style="margin-top:10px; white-space:pre-line;">
+Cute, sparkly, but she’s competitive.
+GOOD = +points • BAD = -points
+Pass if score ≥ <strong>70</strong>
+      </div>
+
+      <div id="mpField" style="position:relative; height:360px; border-radius:16px; border:1px dashed rgba(255,77,136,.35); background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,230,242,.65)); overflow:hidden; margin-top:10px;"></div>
+
+      <div class="center small" style="margin-top:10px;" id="mpMsg"></div>
 
       <div class="center" style="margin-top:10px;">
-        <button class="btn ghost" id="sbLeave">Leave</button>
+        <button class="btn ghost" id="mpLeave">Leave</button>
       </div>
     </div>
   `;
 
-  const canvas = $("sbCanvas");
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-
-  const hitsEl = $("sbHits");
-  const msg = $("sbMsg");
+  const field = $("mpField");
+  const scoreEl = $("mpScore");
+  const msg = $("mpMsg");
 
   let running = true;
-  let total = 12;
-  let beat = 0;
-  let hits = 0;
+  let score = 0;
+  const PASS_SCORE = 70;
 
-  // falling star
-  const star = { x: 360, y: 40, vy: 0, active: false };
-  const zone = { y: 280, h: 30 };
+  // item pools
+  const GOOD = [
+    { emoji: "💗", pts: 8, label: "Heart" },
+    { emoji: "💖", pts: 10, label: "Big heart" },
+    { emoji: "🍓", pts: 9, label: "Strawberry" },
+    { emoji: "🌙", pts: 7, label: "Moon" },
+    { emoji: "📸", pts: 8, label: "Memory" }
+  ];
+  const BAD = [
+    { emoji: "😈", pts: -12, label: "Mean" },
+    { emoji: "💢", pts: -10, label: "Rage" },
+    { emoji: "🧨", pts: -14, label: "Drama" }
+  ];
 
-  function spawnBeat() {
-    star.y = 30;
-    star.vy = 140 + Math.random() * 80;
-    star.active = true;
-    msg.innerText = `Beat ${beat + 1}/${total}…`;
+  function updateScore() {
+    scoreEl.innerText = String(score);
   }
 
-  function draw() {
-    ctx.fillStyle = "rgba(18, 10, 30, 0.95)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // stars
-    ctx.globalAlpha = 0.25;
-    for (let i = 0; i < 90; i++) {
-      const x = (i * 83) % canvas.width;
-      const y = (i * 41) % canvas.height;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(x, y, 2, 2);
-    }
-    ctx.globalAlpha = 1;
-
-    // zone
-    ctx.fillStyle = "rgba(255,77,136,.22)";
-    ctx.fillRect(0, zone.y, canvas.width, zone.h);
-
-    ctx.strokeStyle = "rgba(255,77,136,.55)";
-    ctx.strokeRect(0, zone.y, canvas.width, zone.h);
-
-    // star
-    if (star.active) {
-      ctx.font = "26px ui-monospace, system-ui";
-      ctx.fillText("⭐", star.x - 12, star.y + 10);
-    }
-  }
-
-  let last = performance.now();
-
-  function loop(now) {
+  function spawn() {
     if (!running) return;
-    const dt = (now - last) / 1000;
-    last = now;
 
-    if (!star.active) {
-      spawnBeat();
+    // bias: mostly good, sometimes bad, sometimes “fake cute mean”
+    const roll = Math.random();
+    let item = null;
+    let isBad = false;
+
+    if (roll < 0.72) {
+      item = GOOD[Math.floor(Math.random() * GOOD.length)];
+      isBad = false;
     } else {
-      star.y += star.vy * dt;
-      if (star.y > canvas.height + 40) {
-        // missed
-        star.active = false;
-        beat++;
-        if (beat >= total) return end();
+      item = BAD[Math.floor(Math.random() * BAD.length)];
+      isBad = true;
+    }
+
+    const btn = document.createElement("button");
+    btn.style.position = "absolute";
+    btn.style.left = `${Math.random() * 88 + 2}%`;
+    btn.style.top = `${Math.random() * 70 + 8}%`;
+    btn.style.border = "none";
+    btn.style.background = "rgba(255,255,255,.25)";
+    btn.style.backdropFilter = "blur(6px)";
+    btn.style.borderRadius = "999px";
+    btn.style.padding = "10px 12px";
+    btn.style.cursor = "pointer";
+    btn.style.boxShadow = isBad
+      ? "0 10px 20px rgba(255,40,40,.20)"
+      : "0 10px 20px rgba(255,77,136,.16)";
+    btn.style.transform = `rotate(${(Math.random() * 16 - 8).toFixed(1)}deg)`;
+    btn.style.fontSize = `${Math.round(22 + Math.random() * 20)}px`;
+    btn.innerText = item.emoji;
+
+    // tiny float animation via CSS-ish trick
+    const driftX = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 22);
+    const driftY = - (8 + Math.random() * 20);
+    btn.animate(
+      [
+        { transform: `translate(0px, 0px) rotate(0deg)`, opacity: 1 },
+        { transform: `translate(${driftX}px, ${driftY}px) rotate(${driftX > 0 ? 10 : -10}deg)`, opacity: 0.2 }
+      ],
+      { duration: 950 + Math.random() * 600, easing: "ease-out" }
+    );
+
+    btn.addEventListener("click", () => {
+      if (!running) return;
+      touchAction();
+
+      score += item.pts;
+      score = clamp(score, -50, 999);
+      updateScore();
+
+      if (item.pts > 0) {
+        msg.innerText = `Cute ✅ +${item.pts}`;
+        if (Math.random() < 0.18) setMood("happy", { persist: true });
+      } else {
+        msg.innerText = `Mean 😤 ${item.pts}`;
+        // a little “competitive mean” punch
+        if (Math.random() < 0.45) setMood("angry", { persist: true });
       }
-    }
 
-    draw();
-    requestAnimationFrame(loop);
+      // pop effect
+      btn.remove();
+    });
+
+    field.appendChild(btn);
+
+    // auto-remove
+    setTimeout(() => {
+      try { btn.remove(); } catch {}
+    }, 1200 + Math.random() * 650);
   }
 
-  function press() {
-    if (!running) return;
-    if (!star.active) return;
-    touchAction();
+  // spawn pacing ramps up
+  let spawnMs = 260;
+  const spawnInterval = setInterval(() => {
+    spawn();
+    // gradually faster
+    spawnMs = Math.max(140, spawnMs - 2);
+  }, 220);
 
-    const inZone = star.y >= zone.y && star.y <= zone.y + zone.h;
-    if (inZone) {
-      hits++;
-      hitsEl.innerText = String(hits);
-      msg.innerText = "Perfect 💗";
-      setMood("happy", { persist: true });
-    } else {
-      msg.innerText = "Off-beat 😭";
-      if (Math.random() < 0.25) setMood("sad", { persist: true });
-    }
-
-    star.active = false;
-    beat++;
-    if (beat >= total) end();
-  }
+  const timer = setTimeout(() => end(), 18000);
 
   function end() {
     running = false;
 
-    const passed = hits >= 7; // 7/12 threshold
-    msg.innerText = passed
-      ? "You confessed perfectly under the stars 💘"
-      : "The timing was… shy. Try again later 🥺";
+    clearInterval(spawnInterval);
+    clearTimeout(timer);
+    field.querySelectorAll("button").forEach((b) => b.remove());
 
-    const leave = $("sbLeave");
+    // pass rule
+    const passed = score >= PASS_SCORE;
+
+    msg.innerText = passed
+      ? "Party cleared. You survived her competitive energy 😳💗"
+      : "Party got… hostile. Try again later 🥺";
+
+    const leave = $("mpLeave");
     leave.className = "btn";
     leave.innerText = passed ? "Continue" : "Back to Mini Games";
     leave.onclick = () => {
@@ -2605,27 +2810,17 @@ function trialStarBeat(root) {
       running = false;
       isTrialRunning = false;
       isMiniGameRunning = false;
-      window.removeEventListener("keydown", onKey);
     };
   }
 
-  function onKey(e) {
-    if (e.code === "Space") {
-      e.preventDefault();
-      press();
-    }
-  }
-
-  $("sbLeave").addEventListener("click", () => {
+  $("mpLeave").addEventListener("click", () => {
     touchAction();
     finishStageTrial(4, false);
     showView("minigames");
   });
 
-  window.addEventListener("keydown", onKey);
-
-  msg.innerText = "Get ready…";
-  requestAnimationFrame(loop);
+  // Set a vibe line at start
+  msg.innerText = "She’s smiling… but it’s a competition.";
 }
 
 /***********************
@@ -2633,14 +2828,23 @@ function trialStarBeat(root) {
 ************************/
 load();
 state.stage = clampStage(state.stage || 1);
+enforceCheats();
 recomputeStage();
 renderHUD();
 showView("home");
 speak("Nate… your mission is simple: make Minyoung laugh, feed her, and impress her with gifts 💗");
 startIdleWatcher();
 
+// Dev cheat hotkey: Ctrl+Shift+L
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.shiftKey && (e.key === "L" || e.key === "l")) {
+    e.preventDefault();
+    // only when safe (no games/trials/ending)
+    openCheatMenu();
+  }
+});
+
 // sometimes a popup greets you
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
-
