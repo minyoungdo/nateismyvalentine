@@ -2209,7 +2209,7 @@ function trialPinball(root) {
     t: 0,
     pts: 160
   };
-  alienDog.img.src = `aliendog.png?v=${SPRITE_VERSION}`;
+  alienDog.img.src = `assets/characters/aliendog.png?v=${SPRITE_VERSION}`;
 
   // paddles (simple rectangles)
   const leftPad = { x: 250, y: 310, w: 80, h: 10, up: false };
@@ -2643,3 +2643,4 @@ startIdleWatcher();
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
