@@ -2666,7 +2666,7 @@ function trialPinball(root) {
   - Survive timer + hit score threshold
 ************************/
 function trialMinyoungParty(root) {
-  $("gameTitle").innerText = "🌌 Trial: Galaxy Onion Attack";
+  $("gameTitle").innerText = "🌌 Trial: Destory Onions for Minyoung";
 
   root.innerHTML = `
     <div class="game-frame">
@@ -2699,7 +2699,7 @@ function trialMinyoungParty(root) {
 
   let running = true;
   let score = 0;
-  const PASS_SCORE = 100;
+  const PASS_SCORE = 1000;
 
   // timer
   let tLeft = 18000;
@@ -3288,6 +3288,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
