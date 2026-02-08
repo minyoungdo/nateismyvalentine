@@ -605,9 +605,9 @@ function startFinalEnding() {
   <div class="small" style="margin-bottom:8px;"><strong>Memory Wall</strong></div>
 
   <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
-    <img style="width:100%; border-radius:12px;" src="assets/characters/memory1.png" alt="memory1">
-    <img style="width:100%; border-radius:12px;" src="assets/characters/memory2.png" alt="memory2">
-    <img style="width:100%; border-radius:12px;" src="assets/characters/memory3.png" alt="memory3">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory1.jpg" alt="memory1">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory2.jpg" alt="memory2">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory3.jpg" alt="memory3">
   </div>
 
   <div class="small" style="margin-top:10px; white-space:pre-line;" id="endNote"></div>
@@ -2848,6 +2848,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
