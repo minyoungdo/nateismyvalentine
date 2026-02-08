@@ -2674,7 +2674,7 @@ function trialMinyoungParty(root) {
         <div>
           Move: <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span>
           • Shoot: <span class="kbd">Space</span> (hold)
-          • 18 seconds
+          • 100 seconds
         </div>
         <div>Score: <strong id="gaScore">0</strong> / <strong>100</strong></div>
       </div>
@@ -3288,6 +3288,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
