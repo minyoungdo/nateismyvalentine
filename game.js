@@ -340,7 +340,7 @@ function desiredStageFromAffection(a) {
   let s = 1;
   if (a >= 150) s = 2;
   if (a >= 500) s = 3;
-  if (a >= 1000) s = 4;
+  if (a >= 900) s = 4;
   return clampStage(s);
 }
 
@@ -2848,4 +2848,5 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
