@@ -187,8 +187,16 @@ function setMood(newMood, opts = { persist: true }) {
   DEV CHEATS (helpers)
 ************************/
 function enforceCheats() {
-  if (state.cheats?.unlimitedHearts) state.hearts = Math.max(state.hearts || 0, 999999);
-  if (state.cheats?.unlimitedAffection) state.affection = Math.max(state.affection || 0, 999999);
+  // True infinite hearts
+  if (state.cheats?.unlimitedHearts) {
+    state.hearts = Infinity;
+  }
+
+  // True infinite affection
+  if (state.cheats?.unlimitedAffection) {
+    state.affection = Infinity;
+  }
+
   save();
 }
 function openCheatMenu() {
@@ -356,6 +364,7 @@ function recomputeStage() {
   if (desired >= 2 && state.stageTrialPassed?.[2]) unlocked = 2;
   if (desired >= 3 && state.stageTrialPassed?.[2] && state.stageTrialPassed?.[3]) unlocked = 3;
   if (desired >= 4 && state.stageTrialPassed?.[2] && state.stageTrialPassed?.[3] && state.stageTrialPassed?.[4]) unlocked = 4;
+  if (!Number.isFinite(a)) return 4;
 
   unlocked = clampStage(unlocked);
 
@@ -1065,8 +1074,16 @@ function openItemPopup(item, affectionGained) {
 function renderHUD() {
   enforceCheats();
 
-  $("hearts").innerText = state.cheats?.unlimitedHearts ? "∞" : String(state.hearts);
-  $("affection").innerText = state.cheats?.unlimitedAffection ? "∞" : String(state.affection);
+  $("hearts").innerText =
+  state.cheats?.unlimitedHearts || !Number.isFinite(state.hearts)
+    ? "∞"
+    : String(state.hearts);
+
+$("affection").innerText =
+  state.cheats?.unlimitedAffection || !Number.isFinite(state.affection)
+    ? "∞"
+    : String(state.affection);
+
   $("stage").innerText = state.stage;
   $("mood").innerText = state.mood;
 
@@ -2848,6 +2865,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
