@@ -2666,179 +2666,602 @@ function trialPinball(root) {
   - Survive timer + hit score threshold
 ************************/
 function trialMinyoungParty(root) {
-  $("gameTitle").innerText = "🎉 Trial: Minyoung Party";
+  $("gameTitle").innerText = "🌌 Trial: Galaxy Onion Attack";
 
   root.innerHTML = `
     <div class="game-frame">
       <div class="row">
-        <div>Click good vibes • avoid mean vibes • 18 seconds</div>
-        <div>Score: <strong id="mpScore">0</strong></div>
+        <div>
+          Move: <span class="kbd">←</span>/<span class="kbd">→</span> or <span class="kbd">A</span>/<span class="kbd">D</span>
+          • Shoot: <span class="kbd">Space</span> (hold)
+          • 18 seconds
+        </div>
+        <div>Score: <strong id="gaScore">0</strong> / <strong>100</strong></div>
       </div>
 
-      <div class="small" style="margin-top:10px; white-space:pre-line;">
-Cute, sparkly, but she’s competitive.
-GOOD = +points • BAD = -points
-Pass if score ≥ <strong>70</strong>
-      </div>
+      <canvas class="canvas" id="gaCanvas" width="720" height="360"></canvas>
 
-      <div id="mpField" style="position:relative; height:360px; border-radius:16px; border:1px dashed rgba(255,77,136,.35); background:linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,230,242,.65)); overflow:hidden; margin-top:10px;"></div>
-
-      <div class="center small" style="margin-top:10px;" id="mpMsg"></div>
+      <div class="center small" style="margin-top:10px;" id="gaMsg">Onion fleet inbound. Don’t get hit.</div>
 
       <div class="center" style="margin-top:10px;">
-        <button class="btn ghost" id="mpLeave">Leave</button>
+        <button class="btn ghost" id="gaLeave">Leave</button>
       </div>
     </div>
   `;
 
-  const field = $("mpField");
-  const scoreEl = $("mpScore");
-  const msg = $("mpMsg");
+  const canvas = $("gaCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+
+  const scoreEl = $("gaScore");
+  const msg = $("gaMsg");
+  const leaveBtn = $("gaLeave");
 
   let running = true;
   let score = 0;
-  const PASS_SCORE = 70;
+  const PASS_SCORE = 100;
 
-  // item pools
-  const GOOD = [
-    { emoji: "💗", pts: 8, label: "Heart" },
-    { emoji: "💖", pts: 10, label: "Big heart" },
-    { emoji: "🍓", pts: 9, label: "Strawberry" },
-    { emoji: "🌙", pts: 7, label: "Moon" },
-    { emoji: "📸", pts: 8, label: "Memory" }
-  ];
-  const BAD = [
-    { emoji: "😈", pts: -12, label: "Mean" },
-    { emoji: "💢", pts: -10, label: "Rage" },
-    { emoji: "🧨", pts: -14, label: "Drama" }
-  ];
+  // timer
+  let tLeft = 18000;
+  let last = performance.now();
 
-  function updateScore() {
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+  function addScore(n) {
+    score += n;
     scoreEl.innerText = String(score);
   }
 
-  function spawn() {
-    if (!running) return;
+  /***********************
+    SFX (tiny beeps)
+    - Uses WebAudio, safe fallback if blocked
+  ************************/
+  let audioCtx = null;
+  function sfx(freq = 520, dur = 0.04, type = "square", gain = 0.02) {
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.value = gain;
+      o.connect(g);
+      g.connect(audioCtx.destination);
+      o.start();
+      o.stop(audioCtx.currentTime + dur);
+    } catch {}
+  }
+  const SFX = {
+    shoot() { sfx(820, 0.03, "square", 0.015); },
+    shootPowered() { sfx(960, 0.03, "sawtooth", 0.014); },
+    enemyShoot() { sfx(280, 0.04, "triangle", 0.012); },
+    kill() { sfx(620, 0.03, "square", 0.02); sfx(420, 0.05, "triangle", 0.012); },
+    hit() { sfx(160, 0.08, "sawtooth", 0.02); }
+  };
 
-    // bias: mostly good, sometimes bad, sometimes “fake cute mean”
-    const roll = Math.random();
-    let item = null;
-    let isBad = false;
+  // player
+  const player = {
+    x: canvas.width / 2,
+    y: canvas.height - 34,
+    w: 34,
+    h: 18,
+    speed: 460,
+    vx: 0,
+    hp: 3,
+    invulnMs: 0
+  };
 
-    if (roll < 0.72) {
-      item = GOOD[Math.floor(Math.random() * GOOD.length)];
-      isBad = false;
-    } else {
-      item = BAD[Math.floor(Math.random() * BAD.length)];
-      isBad = true;
+  // power-up (alien dog)
+  const alienDog = {
+    img: new Image(),
+    active: false,      // currently on screen (as a pickup)
+    x: 360,
+    y: -999,
+    w: 34,
+    h: 34,
+    vy: 110,
+    spawnCooldownMs: 2200, // first spawn delay
+    powerModeMs: 0     // time remaining in power-up mode
+  };
+  alienDog.img.src = `assets/characters/aliendog.png?v=${SPRITE_VERSION}`;
+
+  // projectiles
+  const bullets = [];
+  const enemyShots = [];
+
+  // input
+  const keys = { left: false, right: false, fire: false };
+
+  // fire rate
+  let fireCooldownMs = 0;
+
+  // waves
+  let wave = 0;
+  let waveCooldownMs = 450;
+  const enemies = [];
+
+  // background stars
+  const stars = Array.from({ length: 70 }, (_, i) => ({
+    x: (i * 97) % canvas.width,
+    y: (i * 53) % canvas.height,
+    s: 1 + (i % 2),
+    v: 12 + (i % 7)
+  }));
+
+  function spawnWave() {
+    wave += 1;
+
+    const cols = clamp(6 + Math.floor(wave / 2), 6, 10);
+    const rows = clamp(2 + Math.floor(wave / 3), 2, 4);
+    const spacingX = 52;
+    const spacingY = 42;
+
+    const startX = canvas.width / 2 - ((cols - 1) * spacingX) / 2;
+    const startY = 30 + Math.min(40, wave * 4);
+
+    const baseVy = 26 + wave * 4;
+    const baseAmp = 24 + wave * 3;
+    const baseFreq = 1.2 + wave * 0.07;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const shooter = Math.random() < (0.18 + wave * 0.02);
+        enemies.push({
+          x: startX + c * spacingX,
+          y: startY + r * spacingY,
+          r: 16,
+          emoji: "🧅",
+          hp: shooter ? 2 : 1,
+          vy: baseVy + r * 4,
+          amp: baseAmp + r * 6,
+          freq: baseFreq + c * 0.05,
+          phase: Math.random() * Math.PI * 2,
+          shooter,
+          shotCooldown: shooter ? (850 + Math.random() * 950) : 999999
+        });
+      }
     }
 
-    const btn = document.createElement("button");
-    btn.style.position = "absolute";
-    btn.style.left = `${Math.random() * 88 + 2}%`;
-    btn.style.top = `${Math.random() * 70 + 8}%`;
-    btn.style.border = "none";
-    btn.style.background = "rgba(255,255,255,.25)";
-    btn.style.backdropFilter = "blur(6px)";
-    btn.style.borderRadius = "999px";
-    btn.style.padding = "10px 12px";
-    btn.style.cursor = "pointer";
-    btn.style.boxShadow = isBad
-      ? "0 10px 20px rgba(255,40,40,.20)"
-      : "0 10px 20px rgba(255,77,136,.16)";
-    btn.style.transform = `rotate(${(Math.random() * 16 - 8).toFixed(1)}deg)`;
-    btn.style.fontSize = `${Math.round(22 + Math.random() * 20)}px`;
-    btn.innerText = item.emoji;
-
-    // tiny float animation via CSS-ish trick
-    const driftX = (Math.random() < 0.5 ? -1 : 1) * (10 + Math.random() * 22);
-    const driftY = - (8 + Math.random() * 20);
-    btn.animate(
-      [
-        { transform: `translate(0px, 0px) rotate(0deg)`, opacity: 1 },
-        { transform: `translate(${driftX}px, ${driftY}px) rotate(${driftX > 0 ? 10 : -10}deg)`, opacity: 0.2 }
-      ],
-      { duration: 950 + Math.random() * 600, easing: "ease-out" }
-    );
-
-    btn.addEventListener("click", () => {
-      if (!running) return;
-      touchAction();
-
-      score += item.pts;
-      score = clamp(score, -50, 999);
-      updateScore();
-
-      if (item.pts > 0) {
-        msg.innerText = `Cute ✅ +${item.pts}`;
-        if (Math.random() < 0.18) setMood("happy", { persist: true });
-      } else {
-        msg.innerText = `Mean 😤 ${item.pts}`;
-        // a little “competitive mean” punch
-        if (Math.random() < 0.45) setMood("angry", { persist: true });
-      }
-
-      // pop effect
-      btn.remove();
-    });
-
-    field.appendChild(btn);
-
-    // auto-remove
-    setTimeout(() => {
-      try { btn.remove(); } catch {}
-    }, 1200 + Math.random() * 650);
+    msg.innerText = `Wave ${wave} 🚀`;
   }
 
-  // spawn pacing ramps up
-  let spawnMs = 260;
-  const spawnInterval = setInterval(() => {
-    spawn();
-    // gradually faster
-    spawnMs = Math.max(140, spawnMs - 2);
-  }, 220);
+  function shootPlayer() {
+    if (!running) return;
+    if (fireCooldownMs > 0) return;
 
-  const timer = setTimeout(() => end(), 18000);
+    // power-up changes
+    const powered = alienDog.powerModeMs > 0;
+    fireCooldownMs = powered ? 75 : 120;
 
-  function end() {
+    const bulletVy = -760;
+    const bulletR = powered ? 4 : 3;
+
+    // basic shot
+    bullets.push({ x: player.x, y: player.y - 16, vy: bulletVy, r: bulletR });
+
+    // triple shot in power mode
+    if (powered) {
+      bullets.push({ x: player.x - 10, y: player.y - 14, vy: bulletVy, r: bulletR, vx: -120 });
+      bullets.push({ x: player.x + 10, y: player.y - 14, vy: bulletVy, r: bulletR, vx: 120 });
+      SFX.shootPowered();
+    } else {
+      SFX.shoot();
+    }
+  }
+
+  function shootEnemy(e) {
+    enemyShots.push({
+      x: e.x,
+      y: e.y + 12,
+      vy: 270 + wave * 10,
+      r: 3
+    });
+    SFX.enemyShoot();
+  }
+
+  function rectHitCircle(rx, ry, rw, rh, cx, cy, cr) {
+    const x = clamp(cx, rx, rx + rw);
+    const y = clamp(cy, ry, ry + rh);
+    const dx = cx - x;
+    const dy = cy - y;
+    return dx * dx + dy * dy <= cr * cr;
+  }
+
+  function rectsOverlap(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function drawBackground(dt) {
+    ctx.fillStyle = "rgba(10, 8, 22, 0.96)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = "#fff";
+    for (const s of stars) {
+      s.y += s.v * dt;
+      if (s.y > canvas.height) s.y = -4;
+      ctx.fillRect(s.x, s.y, s.s, s.s);
+    }
+    ctx.globalAlpha = 1;
+
+    // power-up glow hint
+    if (alienDog.powerModeMs > 0) {
+      ctx.globalAlpha = 0.18;
+      ctx.fillStyle = "rgba(255,77,136,1)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = "rgba(255,77,136,1)";
+    ctx.fillRect(0, canvas.height - 26, canvas.width, 2);
+    ctx.globalAlpha = 1;
+  }
+
+  function drawPlayer() {
+    // invuln flicker
+    if (player.invulnMs > 0 && Math.floor(player.invulnMs / 80) % 2 === 0) {
+      ctx.globalAlpha = 0.35;
+    }
+
+    ctx.fillStyle = "rgba(255,77,136,.95)";
+    ctx.beginPath();
+    ctx.moveTo(player.x, player.y - 14);
+    ctx.lineTo(player.x - 18, player.y + 10);
+    ctx.lineTo(player.x + 18, player.y + 10);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.globalAlpha = ctx.globalAlpha * 0.85;
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    ctx.fillRect(player.x - 4, player.y - 4, 8, 8);
+
+    ctx.globalAlpha = 1;
+
+    // HP
+    ctx.font = "14px ui-monospace, system-ui";
+    ctx.globalAlpha = 0.85;
+    ctx.fillText("💗".repeat(player.hp), 10, canvas.height - 10);
+
+    // power timer
+    if (alienDog.powerModeMs > 0) {
+      const sec = Math.ceil(alienDog.powerModeMs / 1000);
+      ctx.fillText(`🐶 POWER ${sec}s`, 10, canvas.height - 28);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawBullets() {
+    // player bullets
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    for (const b of bullets) {
+      ctx.fillRect(Math.round(b.x - 1), Math.round(b.y - 8), 2, 10);
+    }
+
+    // enemy shots
+    ctx.fillStyle = "rgba(255,77,136,.95)";
+    for (const s of enemyShots) {
+      ctx.fillRect(Math.round(s.x - 1), Math.round(s.y - 2), 2, 8);
+    }
+  }
+
+  function drawEnemies() {
+    for (const e of enemies) {
+      ctx.font = "24px ui-monospace, system-ui";
+      ctx.globalAlpha = 0.95;
+      ctx.fillText(e.emoji, e.x - 12, e.y + 10);
+
+      if (e.shooter || e.hp > 1) {
+        ctx.globalAlpha = 0.35;
+        ctx.strokeStyle = "rgba(255,255,255,.65)";
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 16, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  function drawAlienDogPickup() {
+    if (!alienDog.active) return;
+
+    const w = alienDog.w;
+    const h = alienDog.h;
+    if (alienDog.img.complete && alienDog.img.naturalWidth > 0) {
+      ctx.globalAlpha = 0.98;
+      ctx.drawImage(alienDog.img, alienDog.x - w / 2, alienDog.y - h / 2, w, h);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.font = "22px ui-monospace, system-ui";
+      ctx.fillText("👽🐶", alienDog.x - 14, alienDog.y + 8);
+    }
+
+    // subtle ring
+    ctx.globalAlpha = 0.25;
+    ctx.strokeStyle = "rgba(255,255,255,.8)";
+    ctx.beginPath();
+    ctx.arc(alienDog.x, alienDog.y, 18, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function end(passed) {
     running = false;
-
-    clearInterval(spawnInterval);
-    clearTimeout(timer);
-    field.querySelectorAll("button").forEach((b) => b.remove());
-
-    // pass rule
-    const passed = score >= PASS_SCORE;
+    isTrialRunning = false;
+    isMiniGameRunning = false;
 
     msg.innerText = passed
-      ? "Party cleared. You survived her competitive energy 😳💗"
-      : "Party got… hostile. Try again later 🥺";
+      ? "Fleet defeated. You absolutely annihilated the onions 😳💗"
+      : "You got overwhelmed… try again later 🥺";
 
-    const leave = $("mpLeave");
-    leave.className = "btn";
-    leave.innerText = passed ? "Continue" : "Back to Mini Games";
-    leave.onclick = () => {
+    leaveBtn.className = "btn";
+    leaveBtn.innerText = passed ? "Continue" : "Back to Mini Games";
+    leaveBtn.onclick = () => {
       touchAction();
       finishStageTrial(4, passed);
       showView("minigames");
     };
 
+    cleanup();
     stopCurrentGame = () => {
-      running = false;
+      cleanup();
       isTrialRunning = false;
       isMiniGameRunning = false;
     };
   }
 
-  $("mpLeave").addEventListener("click", () => {
+  function cleanup() {
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+    canvas.removeEventListener("pointerdown", onPointer);
+    // don't close audioCtx; leaving it is fine and avoids glitches
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keys.left = true;
+    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = true;
+
+    if (e.code === "Space") {
+      e.preventDefault();
+      keys.fire = true;
+      // prime audio permission on first interaction
+      try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); } catch {}
+    }
+  }
+
+  function onKeyUp(e) {
+    if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") keys.left = false;
+    if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") keys.right = false;
+    if (e.code === "Space") keys.fire = false;
+  }
+
+  function onPointer() {
+    keys.fire = true;
+    shootPlayer();
+    setTimeout(() => (keys.fire = false), 120);
+  }
+
+  // Leave = fail
+  leaveBtn.addEventListener("click", () => {
     touchAction();
     finishStageTrial(4, false);
     showView("minigames");
+    cleanup();
   });
 
-  // Set a vibe line at start
-  msg.innerText = "She’s smiling… but it’s a competition.";
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+  canvas.addEventListener("pointerdown", onPointer);
+
+  function maybeSpawnAlienDog(dtMs) {
+    // cooldown counts down while NOT active and NOT in power mode
+    if (alienDog.powerModeMs > 0) return;
+    if (alienDog.active) return;
+
+    alienDog.spawnCooldownMs -= dtMs;
+    if (alienDog.spawnCooldownMs > 0) return;
+
+    // spawn pickup
+    alienDog.active = true;
+    alienDog.x = 80 + Math.random() * (canvas.width - 160);
+    alienDog.y = -20;
+    alienDog.vy = 120 + Math.random() * 60;
+
+    // next spawn after it’s collected/missed
+    alienDog.spawnCooldownMs = 4200 + Math.random() * 2400;
+  }
+
+  function loop(now) {
+    if (!running) return;
+    const dt = (now - last) / 1000;
+    const dtMs = dt * 1000;
+    last = now;
+
+    // countdown
+    tLeft -= dtMs;
+    if (tLeft <= 0) {
+      end(score >= PASS_SCORE);
+      return;
+    }
+
+    // power timer
+    alienDog.powerModeMs = Math.max(0, alienDog.powerModeMs - dtMs);
+
+    // waves
+    waveCooldownMs -= dtMs;
+    if (waveCooldownMs <= 0 && enemies.length < 10) {
+      spawnWave();
+      waveCooldownMs = 1300 + Math.max(0, 700 - wave * 80);
+    }
+
+    // player movement
+    player.vx = 0;
+    if (keys.left) player.vx = -player.speed;
+    if (keys.right) player.vx = player.speed;
+
+    player.x += player.vx * dt;
+    player.x = clamp(player.x, 22, canvas.width - 22);
+
+    // fire
+    fireCooldownMs = Math.max(0, fireCooldownMs - dtMs);
+    if (keys.fire) shootPlayer();
+
+    // invuln
+    player.invulnMs = Math.max(0, player.invulnMs - dtMs);
+
+    // alien dog pickup spawn + movement
+    maybeSpawnAlienDog(dtMs);
+    if (alienDog.active) {
+      alienDog.y += alienDog.vy * dt;
+
+      const pRect = { x: player.x - player.w / 2, y: player.y - player.h / 2, w: player.w, h: player.h };
+      const aRect = { x: alienDog.x - alienDog.w / 2, y: alienDog.y - alienDog.h / 2, w: alienDog.w, h: alienDog.h };
+
+      if (rectsOverlap(pRect, aRect)) {
+        alienDog.active = false;
+        alienDog.powerModeMs = 4000;
+        msg.innerText = "ALIEN DOG MODE 🐶💫";
+        // little sparkle sound
+        sfx(1040, 0.06, "triangle", 0.02);
+        sfx(840, 0.07, "sine", 0.015);
+        if (Math.random() < 0.35) setMood("happy", { persist: true });
+      } else if (alienDog.y > canvas.height + 40) {
+        alienDog.active = false;
+      }
+    }
+
+    // bullets update (some powered bullets have slight vx)
+    for (const b of bullets) {
+      b.y += b.vy * dt;
+      if (b.vx) b.x += b.vx * dt;
+    }
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      if (bullets[i].y < -30 || bullets[i].x < -40 || bullets[i].x > canvas.width + 40) bullets.splice(i, 1);
+    }
+
+    // enemy shots update
+    for (const s of enemyShots) s.y += s.vy * dt;
+    for (let i = enemyShots.length - 1; i >= 0; i--) {
+      if (enemyShots[i].y > canvas.height + 30) enemyShots.splice(i, 1);
+    }
+
+    // enemies update (sine drift + descent)
+    const t = performance.now() / 1000;
+    for (const e of enemies) {
+      e.y += e.vy * dt;
+      e.x += Math.sin(t * e.freq + e.phase) * e.amp * dt;
+      e.x = clamp(e.x, 16, canvas.width - 16);
+
+      if (e.shooter) {
+        e.shotCooldown -= dtMs;
+        if (e.shotCooldown <= 0) {
+          e.shotCooldown = 700 + Math.random() * 900;
+          if (Math.random() < 0.55) shootEnemy(e);
+        }
+      }
+    }
+
+    // player hit by enemy shots
+    if (player.invulnMs <= 0) {
+      for (let i = enemyShots.length - 1; i >= 0; i--) {
+        const s = enemyShots[i];
+        const hit = rectHitCircle(
+          player.x - player.w / 2,
+          player.y - player.h / 2,
+          player.w,
+          player.h,
+          s.x,
+          s.y,
+          6
+        );
+        if (hit) {
+          enemyShots.splice(i, 1);
+          player.hp -= 1;
+          player.invulnMs = 800;
+          msg.innerText = "Hit! 😭";
+          SFX.hit();
+
+          if (Math.random() < 0.5) setMood("angry", { persist: true });
+          if (player.hp <= 0) {
+            end(false);
+            return;
+          }
+          break;
+        }
+      }
+    }
+
+    // enemies escaping bottom = penalty
+    for (let i = enemies.length - 1; i >= 0; i--) {
+      if (enemies[i].y > canvas.height + 20) {
+        enemies.splice(i, 1);
+        addScore(-12);
+        msg.innerText = "An onion escaped 😭  (-12)";
+        if (Math.random() < 0.35) setMood("sad", { persist: true });
+      }
+    }
+
+    // bullets vs enemies
+    for (let ei = enemies.length - 1; ei >= 0; ei--) {
+      const e = enemies[ei];
+      for (let bi = bullets.length - 1; bi >= 0; bi--) {
+        const b = bullets[bi];
+        const dx = b.x - e.x;
+        const dy = b.y - e.y;
+        if (dx * dx + dy * dy <= (e.r + 6) * (e.r + 6)) {
+          bullets.splice(bi, 1);
+          e.hp -= 1;
+
+          if (e.hp <= 0) {
+            enemies.splice(ei, 1);
+
+            // points (power mode gives small bonus too)
+            const powered = alienDog.powerModeMs > 0;
+            const basePts = e.shooter ? 14 : 10;
+            const pts = powered ? basePts + 2 : basePts;
+
+            addScore(pts);
+            msg.innerText = `Blasted! +${pts}`;
+            SFX.kill();
+
+            if (Math.random() < 0.18) setMood("happy", { persist: true });
+          } else {
+            msg.innerText = "Hit! (finish it)";
+          }
+          break;
+        }
+      }
+    }
+
+    // draw
+    drawBackground(dt);
+    drawBullets();
+    drawEnemies();
+    drawAlienDogPickup();
+    drawPlayer();
+
+    // pass hint
+    if (score >= PASS_SCORE) {
+      msg.innerText = alienDog.powerModeMs > 0
+        ? "Score ≥ 100. POWER MODE, SURVIVE 🐶💫"
+        : "Score ≥ 100. Survive 😳";
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  stopCurrentGame = () => {
+    running = false;
+    isTrialRunning = false;
+    isMiniGameRunning = false;
+    cleanup();
+  };
+
+  msg.innerText = "Onion fleet inbound. Lock in 😤";
+  requestAnimationFrame(loop);
 }
+
 
 /***********************
   INIT
@@ -2865,6 +3288,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
