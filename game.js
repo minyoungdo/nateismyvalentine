@@ -601,18 +601,18 @@ function startFinalEnding() {
         <div id="endChoices" style="display:flex; flex-direction:column; gap:10px; margin-top:12px;"></div>
       </div>
 
-      <div style="width:320px; border-radius:14px; border:1px dashed rgba(255,77,136,.35); background:rgba(255,255,255,.65); padding:10px;">
-        <div class="small" style="margin-bottom:8px;"><strong>Memory Wall (all stages)</strong></div>
-        <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(1, "neutral")}" alt="stage1">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(2, "neutral")}" alt="stage2">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(3, "neutral")}" alt="stage3">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(4, "neutral")}" alt="stage4">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(Math.max(1, state.stage), "happy")}" alt="happy">
-          <img style="width:100%; border-radius:12px;" src="${spritePathFor(Math.max(1, state.stage), "sad")}" alt="sad">
-        </div>
-        <div class="small" style="margin-top:10px; white-space:pre-line;" id="endNote"></div>
-      </div>
+<div style="width:320px; border-radius:14px; border:1px dashed rgba(255,77,136,.35); background:rgba(255,255,255,.65); padding:10px;">
+  <div class="small" style="margin-bottom:8px;"><strong>Memory Wall</strong></div>
+
+  <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory1.png" alt="memory1">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory2.png" alt="memory2">
+    <img style="width:100%; border-radius:12px;" src="assets/characters/memory3.png" alt="memory3">
+  </div>
+
+  <div class="small" style="margin-top:10px; white-space:pre-line;" id="endNote"></div>
+</div>
+
     </div>
 
     <div class="center small" style="margin-top:10px;" id="endMsg"></div>
@@ -2848,6 +2848,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
