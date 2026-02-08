@@ -677,7 +677,7 @@ function startFinalEnding() {
       endingText =
         "ENDING: Soulmates\n\n" +
         "You didn’t just love her loudly.\n" +
-        "You loved her accurately.\n\n" +
+        "You loved her right.\n\n" +
         "Minyoung: “Okay… stop. I’m gonna cry.” 💗";
       mood = "happy";
     } else if (endingKey === "chaos") {
@@ -685,7 +685,7 @@ function startFinalEnding() {
         "ENDING: Chaos Cute\n\n" +
         "You made love feel light.\n" +
         "Not shallow. Just… breathable.\n\n" +
-        "Minyoung: “Why are you like this… I’m obsessed.” 💘";
+        "Minyoung: “Why are you like that… I’m addicted.” 💘";
       mood = "happy";
     } else {
       endingText =
@@ -2848,6 +2848,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
