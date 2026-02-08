@@ -728,7 +728,7 @@ function startFinalEnding() {
     "The night looks like pixel starlight.\nMinyoung turns to you.\n\nMinyoung: “So… what are we doing, exactly?”",
     [
       {
-        label: "“We’re building a life that feels safe.”",
+        label: "“I'm showing you what you mean to me.”",
         soft: 2,
         devotion: 1,
         onPick: () => {
@@ -741,17 +741,17 @@ function startFinalEnding() {
                 devotion: 1,
                 onPick: () => {
                   setScene(
-                    "You move like you already know what she needs.\nShe watches you like she’s memorizing your hands.\n\nMinyoung: “That’s… unfair.”",
+                    "You already know what she needs.\nShe watches you like she’s memorizing your hands.\n\nMinyoung: “That’s… so sweet of you.”",
                     [
                       {
                         label: "Make a silly joke to cut the tension.",
                         chaos: 2,
                         onPick: () => {
                           setScene(
-                            "She laughs. Quietly at first. Then fully.\n\nMinyoung: “Okay. Fine. You win.”",
+                            "She laughs. \n\nMinyoung: “Afi! I am not food, hahaha!”",
                             [
                               { label: "Hold her hand.", soft: 1, devotion: 2, onPick: finishEnding },
-                              { label: "Say “I’m in love with you” very plainly.", devotion: 3, onPick: finishEnding }
+                              { label: "Say “I love you so much.” very plainly.", devotion: 3, onPick: finishEnding }
                             ]
                           );
                         }
@@ -761,10 +761,10 @@ function startFinalEnding() {
                         devotion: 3,
                         onPick: () => {
                           setScene(
-                            "She reads it twice.\nOnce with her eyes.\nOnce with her whole chest.\n\nMinyoung: “Stop…”",
+                            "She reads it twice.\nOnce with her eyes.\nOnce with her whole heart.\n\nMinyoung: “Stop…”",
                             [
                               { label: "Kiss her forehead.", soft: 2, devotion: 1, onPick: finishEnding },
-                              { label: "Offer her your hoodie, like it’s a ring.", chaos: 1, soft: 1, onPick: finishEnding }
+                              { label: "Hug her tight, until you feel each other's heartbeats.", chaos: 1, soft: 1, onPick: finishEnding }
                             ]
                           );
                         }
@@ -778,9 +778,9 @@ function startFinalEnding() {
                 soft: 3,
                 onPick: () => {
                   setScene(
-                    "Time slows.\nShe leans into you like it’s the most natural thing.\n\nMinyoung: “This is enough.”",
+                    "Time slows.\nShe leans into you like it’s the most comfortable place to be.\n\nMinyoung: “You make me feel so cozy.”",
                     [
-                      { label: "Stay. Don’t perform.", soft: 3, onPick: finishEnding },
+                      { label: "Don't go. I don't want you to go.", soft: 3, onPick: finishEnding },
                       { label: "Whisper something sweet.", devotion: 2, soft: 1, onPick: finishEnding }
                     ]
                   );
@@ -799,14 +799,14 @@ function startFinalEnding() {
             "Minyoung: “Explain dumb.”\n\nThe stars blink like they’re listening.",
             [
               {
-                label: "Make her laugh so hard she forgets she’s worried.",
+                label: "Herbal butthole show.",
                 chaos: 3,
                 onPick: () => {
                   setScene(
                     "She tries to stay serious.\nShe fails.\n\nMinyoung: “I hate you.” (affectionate)",
                     [
-                      { label: "Offer snacks like a peace treaty.", chaos: 1, soft: 2, onPick: finishEnding },
-                      { label: "Do a dramatic bow: “My lady.”", chaos: 3, onPick: finishEnding }
+                      { label: "Bring out the snack tray you prepared.", chaos: 1, soft: 2, onPick: finishEnding },
+                      { label: "You go serious and say: “But, whose butthole will be on the show?”", chaos: 3, onPick: finishEnding }
                     ]
                   );
                 }
@@ -816,7 +816,7 @@ function startFinalEnding() {
                 devotion: 3,
                 onPick: () => {
                   setScene(
-                    "Her eyes go soft.\n\nMinyoung: “Okay… don’t say it like that.”",
+                    "Her black black eyes go soft.\n\nMinyoung: “Noooo lies lies lies!”",
                     [
                       { label: "Say it again, slower.", devotion: 3, onPick: finishEnding },
                       { label: "Switch to teasing to save her blush.", chaos: 2, onPick: finishEnding }
@@ -2848,5 +2848,6 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
