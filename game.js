@@ -2551,6 +2551,544 @@ const quizData = [
   displayQuestion();
 }
 
+/***********************
+Tetris
+************************
+
+/***********************
+  Mini Game: Gift Tetris (replaces Gift Sorting Panic)
+  - Uses existing Minyoung Maker aesthetics (game-frame, btn, kbd)
+  - Rewards granted at end of run
+************************/
+function gameTetris(root) {
+  touchAction();
+  $("gameTitle").innerText = "🎁 Gift Tetris Panic";
+
+  // If you added the HTML block in the page:
+  // - show it inside gameArea
+  root.innerHTML = "";
+  const wrap = document.getElementById("tetrisWrap");
+  if (!wrap) {
+    root.innerHTML = `<div class="game-frame">Missing #tetrisWrap HTML. Paste the HTML block once into your page.</div>`;
+    isMiniGameRunning = false;
+    return;
+  }
+  wrap.classList.remove("hidden");
+  root.appendChild(wrap);
+
+  // Elements
+  const canvas = document.getElementById("tCanvas");
+  const nextBox = document.getElementById("tNext");
+  const startBtn = document.getElementById("tStartBtn");
+  const restartBtn = document.getElementById("tRestartBtn");
+  const msg = document.getElementById("tMsg");
+  const scoreEl = document.getElementById("tScore");
+  const levelEl = document.getElementById("tLevel");
+  const linesEl = document.getElementById("tLines");
+  const timeEl = document.getElementById("tTime");
+
+  // Safety reset (in case the user re-enters)
+  canvas.innerHTML = "";
+  nextBox.innerHTML = "";
+  msg.innerText = "Press Start to begin.";
+  restartBtn.style.display = "none";
+
+  let running = false;
+  let disposed = false;
+
+  // --- Tetris engine (adapted from your snippet, trimmed + safer) ---
+  const tetris = {
+    board: [],
+    pSize: 20,
+    canvasHeight: 440,
+    canvasWidth: 200,
+    boardHeight: 0,
+    boardWidth: 0,
+    spawnX: 4,
+    spawnY: 1,
+
+    shapes: [
+      [[-1, 1],[0, 1],[1, 1],[0, 0]],       // T
+      [[-1, 0],[0, 0],[1, 0],[2, 0]],       // I
+      [[-1,-1],[-1,0],[0,0],[1,0]],         // L
+      [[1,-1],[-1,0],[0,0],[1,0]],          // J
+      [[0,-1],[1,-1],[-1,0],[0,0]],         // S
+      [[-1,-1],[0,-1],[0,0],[1,0]],         // Z
+      [[0,-1],[1,-1],[0,0],[1,0]]           // O
+    ],
+
+    tempShapes: null,
+    curShape: null,
+    curShapeIndex: null,
+    curX: 0,
+    curY: 0,
+    curSqs: [],
+    nextShape: null,
+    nextShapeIndex: null,
+    sqs: [],
+    score: 0,
+    level: 1,
+    numLevels: 10,
+    time: 0,
+    timer: null,
+    pTimer: null,
+    speed: 700,
+    lines: 0,
+    isActive: 0,
+    curComplete: false,
+
+    // rewards snapshot (for addRewards)
+    finalScore: 0,
+    finalLines: 0,
+
+    init() {
+      running = true;
+      this.reset();
+      this.initBoard();
+      this.initLevelScores();
+      this.initShapes();
+      this.bindKeyEvents();
+      this.play();
+      this.initTimer();
+      this.renderInfo();
+      msg.innerText = "Stack gifts neatly. Don’t overflow 😤";
+    },
+
+    reset() {
+      this.board = [];
+      this.tempShapes = null;
+      this.curShape = null;
+      this.curShapeIndex = null;
+      this.curX = 0;
+      this.curY = 0;
+      this.curSqs = [];
+      this.nextShape = null;
+      this.nextShapeIndex = null;
+      this.sqs = [];
+      this.score = 0;
+      this.level = 1;
+      this.time = 0;
+      this.speed = 700;
+      this.lines = 0;
+      this.isActive = 0;
+      this.curComplete = false;
+      this.clearTimers();
+      canvas.innerHTML = "";
+      nextBox.innerHTML = "";
+      this.renderInfo();
+    },
+
+    initBoard() {
+      this.boardHeight = this.canvasHeight / this.pSize;
+      this.boardWidth = this.canvasWidth / this.pSize;
+      const s = this.boardHeight * this.boardWidth;
+      for (let i = 0; i < s; i++) this.board.push(0);
+    },
+
+    initLevelScores() {
+      let c = 1;
+      for (let i = 1; i <= this.numLevels; i++) {
+        this["level" + i] = [c * 1000, 40 * i, 5 * i];
+        c = c + c;
+      }
+    },
+
+    renderInfo() {
+      scoreEl.innerText = String(this.score);
+      levelEl.innerText = String(this.level);
+      linesEl.innerText = String(this.lines);
+      timeEl.innerText = String(this.time);
+    },
+
+    initShapes() {
+      this.curSqs = [];
+      this.curComplete = false;
+      this.shiftTempShapes();
+      this.curShapeIndex = this.tempShapes[0];
+      this.curShape = this.shapes[this.curShapeIndex];
+      this.initNextShape();
+      this.setCurCoords(this.spawnX, this.spawnY);
+      this.drawShape(this.curX, this.curY, this.curShape);
+    },
+
+    initNextShape() {
+      if (typeof this.tempShapes[1] === "undefined") this.initTempShapes();
+      this.nextShapeIndex = this.tempShapes[1];
+      this.nextShape = this.shapes[this.nextShapeIndex];
+      this.drawNextShape();
+    },
+
+    initTempShapes() {
+      this.tempShapes = [];
+      for (let i = 0; i < this.shapes.length; i++) this.tempShapes.push(i);
+      let k = this.tempShapes.length;
+      while (--k) {
+        const j = Math.floor(Math.random() * (k + 1));
+        const tmp = this.tempShapes[k];
+        this.tempShapes[k] = this.tempShapes[j];
+        this.tempShapes[j] = tmp;
+      }
+    },
+
+    shiftTempShapes() {
+      if (!this.tempShapes) this.initTempShapes();
+      else this.tempShapes.shift();
+    },
+
+    initTimer() {
+      const tick = () => {
+        if (!running || disposed) return;
+        this.time++;
+        this.renderInfo();
+        this.timer = setTimeout(tick, 2000);
+      };
+      this.timer = setTimeout(tick, 2000);
+    },
+
+    clearTimers() {
+      clearTimeout(this.timer);
+      clearTimeout(this.pTimer);
+      this.timer = null;
+      this.pTimer = null;
+    },
+
+    setCurCoords(x, y) {
+      this.curX = x;
+      this.curY = y;
+    },
+
+    createSquare(x, y, type) {
+      const el = document.createElement("div");
+      el.className = "t-square t-type" + type;
+      el.style.left = x * this.pSize + "px";
+      el.style.top = y * this.pSize + "px";
+      return el;
+    },
+
+    drawShape(x, y, p) {
+      for (let i = 0; i < p.length; i++) {
+        const newX = p[i][0] + x;
+        const newY = p[i][1] + y;
+        this.curSqs[i] = this.createSquare(newX, newY, this.curShapeIndex);
+      }
+      for (let k = 0; k < this.curSqs.length; k++) canvas.appendChild(this.curSqs[k]);
+    },
+
+    drawNextShape() {
+      const ns = [];
+      for (let i = 0; i < this.nextShape.length; i++) {
+        ns[i] = this.createSquare(this.nextShape[i][0] + 2, this.nextShape[i][1] + 2, this.nextShapeIndex);
+      }
+      nextBox.innerHTML = "";
+      for (let k = 0; k < ns.length; k++) nextBox.appendChild(ns[k]);
+    },
+
+    removeCur() {
+      for (const el of this.curSqs) {
+        if (el && el.parentNode === canvas) canvas.removeChild(el);
+      }
+      this.curSqs = [];
+    },
+
+    whichKey(e) {
+      return e?.keyCode || e?.which || 0;
+    },
+
+    bindKeyEvents() {
+      const onKeyDown = (e) => {
+        if (!running || disposed) return;
+        const c = this.whichKey(e);
+        switch (c) {
+          case 37: this.move("L"); break;
+          case 38: this.move("RT"); break;
+          case 39: this.move("R"); break;
+          case 40: this.move("D"); break;
+          case 27: this.togglePause(); break;
+          default: break;
+        }
+      };
+
+      // Save reference for cleanup
+      this._onKeyDown = onKeyDown;
+      document.addEventListener("keydown", onKeyDown, false);
+    },
+
+    unbindKeyEvents() {
+      if (this._onKeyDown) document.removeEventListener("keydown", this._onKeyDown, false);
+      this._onKeyDown = null;
+    },
+
+    togglePause() {
+      if (this.isActive === 1) {
+        this.clearTimers();
+        this.isActive = 0;
+        msg.innerText = "Paused. Press Esc to resume.";
+      } else {
+        this.play();
+        this.initTimer();
+        this.isActive = 1;
+        msg.innerText = "Back in it 😤";
+      }
+    },
+
+    play() {
+      const loop = () => {
+        if (!running || disposed) return;
+
+        this.move("D");
+
+        if (this.curComplete) {
+          this.markBoardShape(this.curX, this.curY, this.curShape);
+          for (const el of this.curSqs) this.sqs.push(el);
+          this.calcScore({ shape: true });
+          this.checkRows();
+          this.checkScore();
+          this.initShapes();
+        }
+
+        this.pTimer = setTimeout(loop, this.speed);
+        this.isActive = 1;
+      };
+      this.pTimer = setTimeout(loop, this.speed);
+    },
+
+    incScore(amount) {
+      this.score += amount;
+      this.renderInfo();
+    },
+
+    incLevel() {
+      this.level++;
+      this.speed = Math.max(120, this.speed - 75);
+      this.renderInfo();
+    },
+
+    incLines(num) {
+      this.lines += num;
+      this.renderInfo();
+    },
+
+    calcScore(args) {
+      const lines = args.lines || 0;
+      const shape = args.shape || false;
+      let add = 0;
+
+      if (lines > 0) {
+        add += lines * this["level" + this.level][1];
+        this.incLines(lines);
+      }
+      if (shape === true) {
+        add += this["level" + this.level][2];
+      }
+      this.incScore(add);
+    },
+
+    checkScore() {
+      if (this.level < this.numLevels && this.score >= this["level" + this.level][0]) this.incLevel();
+    },
+
+    getBoardIdx(x, y) {
+      return x + y * this.boardWidth;
+    },
+
+    boardPos(x, y) {
+      return this.board[x + y * this.boardWidth];
+    },
+
+    markBoardAt(x, y, val) {
+      this.board[this.getBoardIdx(x, y)] = val;
+    },
+
+    markBoardShape(x, y, p) {
+      for (let i = 0; i < p.length; i++) {
+        const newX = p[i][0] + x;
+        const newY = p[i][1] + y;
+        this.markBoardAt(newX, newY, 1);
+      }
+    },
+
+    isOB(x, y, p) {
+      const w = this.boardWidth - 1;
+      const h = this.boardHeight - 1;
+      for (let i = 0; i < p.length; i++) {
+        const newX = p[i][0] + x;
+        const newY = p[i][1] + y;
+        if (newX < 0 || newX > w || newY < 0 || newY > h) return true;
+      }
+      return false;
+    },
+
+    isCollision(x, y, p) {
+      for (let i = 0; i < p.length; i++) {
+        const newX = p[i][0] + x;
+        const newY = p[i][1] + y;
+        if (this.boardPos(newX, newY) === 1) return true;
+      }
+      return false;
+    },
+
+    checkMove(x, y, p) {
+      return !(this.isOB(x, y, p) || this.isCollision(x, y, p));
+    },
+
+    move(dir) {
+      let axis = "";
+      let tempX = this.curX;
+      let tempY = this.curY;
+
+      switch (dir) {
+        case "L": axis = "left"; tempX -= 1; break;
+        case "R": axis = "left"; tempX += 1; break;
+        case "D": axis = "top";  tempY += 1; break;
+        case "RT": this.rotate(); return;
+        default: return;
+      }
+
+      if (this.checkMove(tempX, tempY, this.curShape)) {
+        for (const sq of this.curSqs) {
+          const v = parseInt(sq.style[axis], 10);
+          const next = (dir === "L") ? (v - this.pSize) : (v + this.pSize);
+          sq.style[axis] = next + "px";
+        }
+        this.curX = tempX;
+        this.curY = tempY;
+      } else if (dir === "D") {
+        // hit bottom
+        if (this.curY === 1) {
+          this.gameOver();
+          return;
+        }
+        this.curComplete = true;
+      }
+    },
+
+    rotate() {
+      // no rotate for square
+      if (this.curShapeIndex === 6) return;
+
+      const temp = [];
+      for (let i = 0; i < this.curShape.length; i++) {
+        const pt = this.curShape[i];
+        temp.push([pt[1] * -1, pt[0]]);
+      }
+
+      if (this.checkMove(this.curX, this.curY, temp)) {
+        this.curShape = temp;
+        this.removeCur();
+        this.drawShape(this.curX, this.curY, this.curShape);
+      }
+    },
+
+    getRowState(y) {
+      let c = 0;
+      for (let x = 0; x < this.boardWidth; x++) if (this.boardPos(x, y) === 1) c++;
+      if (c === 0) return "E";
+      if (c === this.boardWidth) return "F";
+      return "U";
+    },
+
+    emptyBoardRow(y) {
+      for (let x = 0; x < this.boardWidth; x++) this.markBoardAt(x, y, 0);
+    },
+
+    removeBlock(x, y) {
+      this.markBoardAt(x, y, 0);
+      for (let i = this.sqs.length - 1; i >= 0; i--) {
+        const b = this.sqs[i];
+        const bx = parseInt(b.style.left, 10) / this.pSize;
+        const by = parseInt(b.style.top, 10) / this.pSize;
+        if (bx === x && by === y) {
+          if (b.parentNode === canvas) canvas.removeChild(b);
+          this.sqs.splice(i, 1);
+        }
+      }
+    },
+
+    removeRow(y) {
+      for (let x = 0; x < this.boardWidth; x++) this.removeBlock(x, y);
+    },
+
+    setBlock(x, y, block) {
+      this.markBoardAt(x, y, 1);
+      block.style.left = x * this.pSize + "px";
+      block.style.top = y * this.pSize + "px";
+    },
+
+    shiftRow(y, amount) {
+      for (let i = 0; i < this.sqs.length; i++) {
+        const b = this.sqs[i];
+        const bx = parseInt(b.style.left, 10) / this.pSize;
+        const by = parseInt(b.style.top, 10) / this.pSize;
+        if (by === y) this.setBlock(bx, y + amount, b);
+      }
+      this.emptyBoardRow(y);
+    },
+
+    checkRows() {
+      let cleared = 0;
+
+      for (let y = this.boardHeight - 1; y >= 0; y--) {
+        const st = this.getRowState(y);
+        if (st === "F") {
+          this.removeRow(y);
+          cleared++;
+        } else if (st === "U" && cleared > 0) {
+          this.shiftRow(y, cleared);
+        } else if (st === "E" && cleared === 0) {
+          // early exit if nothing above
+        }
+      }
+
+      if (cleared > 0) {
+        this.calcScore({ lines: cleared });
+        msg.innerText = cleared >= 2 ? `Cleaned up ${cleared} lines 😳💗` : `Line cleared +${cleared}`;
+      }
+    },
+
+    gameOver() {
+      this.clearTimers();
+      this.unbindKeyEvents();
+      running = false;
+      this.isActive = 0;
+
+      this.finalScore = this.score;
+      this.finalLines = this.lines;
+
+      canvas.innerHTML = `
+        <div style="
+          position:absolute; inset:0;
+          display:flex; align-items:center; justify-content:center;
+          text-align:center; padding:14px;
+          background:rgba(255,255,255,.75);
+          font-weight:700;
+          border-radius:16px;
+        ">
+          GAME OVER<br><span style="font-weight:600; font-size:12px;">Score ${this.score} • Lines ${this.lines}</span>
+        </div>
+      `;
+
+      msg.innerText = "Minyoung: “Okay… that was stressful.” 😭";
+      restartBtn.style.display = "inline-block";
+
+      // Reward payout
+      payoutRewards(this.finalScore, this.finalLines);
+    }
+  };
+
+  // --- Rewards mapping ---
+  function payoutRewards(score, lines) {
+    // Tuned to feel rewarding but capped
+    const heartsEarned = clamp(Math.floor(score / 140) + lines * 2, 8, 60);
+    const affectionEarned = clamp(Math.floor(score / 380) + Math.floor(lines / 2) + 3, 4, 30);
+
+    addRewards(heartsEarned, affectionEarned);
+
+    // mood reactions
+    if (score >= 1200 || lines >= 10) setMood("happy", { persist: true });
+    else if (score <= 250 && Math.random() < 0.35) setMood(
+
+      
+
 
 /***********************
   TRIAL 2: Dakgalbi (timing)
@@ -3638,6 +4176,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
