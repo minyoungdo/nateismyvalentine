@@ -127,16 +127,6 @@
           <div class="tile-title">🐶 Fudge Zoomies</div>
           <div class="tile-sub">Dodge incoming dogs • survive as long as you want</div>
         </button>
-        
-        <button class="tile" data-game="balance">
-          <div class="tile-title">💌 Balance the Love Meter</div>
-          <div class="tile-sub">Keep the needle centered • chaos increases</div>
-        </button>
-        
-        <button class="tile" data-game="cake">
-          <div class="tile-title">🍰 Cake Stack Chaos</div>
-          <div class="tile-sub">Drop layers perfectly • don’t let it topple</div>
-        </button>
 
       </div>
     </section>
@@ -241,8 +231,110 @@
   </div>
 </div>
 
+
+  <!-- Hangman -->
+<div id="hangmanWrap" class="hidden">
+  <div class="game-frame">
+    <div class="row">
+      <div class="small">
+        Type letters <span class="kbd">A-Z</span> • Restart anytime
+      </div>
+      <div class="small">
+        Hearts: <strong id="hEarned">0</strong> • Affection: <strong id="aEarned">0</strong>
+      </div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; align-items:flex-start;">
+      <!-- Left: figure -->
+      <div
+        style="
+          flex:0 0 220px;
+          border-radius:16px;
+          border:1px dashed rgba(255,77,136,.35);
+          background:rgba(255,255,255,.65);
+          padding:12px;
+        "
+      >
+        <div class="small" style="margin-bottom:6px;"><strong>Attempts</strong></div>
+
+        <svg height="250" width="200" class="h-figure" aria-label="hangman figure">
+          <!-- Rod -->
+          <line x1="60" y1="20" x2="140" y2="20"></line>
+          <line x1="140" y1="20" x2="140" y2="50"></line>
+          <line x1="60" y1="20" x2="60" y2="230"></line>
+          <line x1="20" y1="230" x2="100" y2="230"></line>
+
+          <!-- Person (hidden parts that appear on wrong guesses) -->
+          <circle cx="140" cy="70" r="20" class="figure-part"></circle>
+          <line x1="140" y1="90" x2="140" y2="150" class="figure-part"></line>
+          <line x1="140" y1="120" x2="120" y2="100" class="figure-part"></line>
+          <line x1="140" y1="120" x2="160" y2="100" class="figure-part"></line>
+          <line x1="140" y1="150" x2="120" y2="180" class="figure-part"></line>
+          <line x1="140" y1="150" x2="160" y2="180" class="figure-part"></line>
+        </svg>
+
+        <div id="wrong-letters" class="small" style="margin-top:8px;"></div>
+
+        <div class="center" style="margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn ghost" id="hRestartBtn">Restart</button>
+        </div>
+
+        <div class="center small" style="margin-top:10px;">
+          Win for bigger rewards. Fewer wrong letters = more hearts 💗
+        </div>
+      </div>
+
+      <!-- Right: word + messages -->
+      <div
+        style="
+          flex:1;
+          min-width:240px;
+          border-radius:16px;
+          border:1px dashed rgba(255,77,136,.35);
+          background:rgba(255,255,255,.65);
+          padding:12px;
+        "
+      >
+        <div class="small"><strong id="hTitle">📝 Hangman</strong></div>
+
+        <div id="word" class="h-word" style="margin-top:10px;"></div>
+
+        <div id="notification-container" class="h-note small" style="margin-top:10px;">
+          <span id="hNoteText">You already tried that letter.</span>
+        </div>
+
+        <div
+          id="popup-container"
+          class="h-popup"
+          style="
+            display:none;
+            margin-top:14px;
+            border-radius:16px;
+            border:1px dashed rgba(255,77,136,.35);
+            background:rgba(255,255,255,.75);
+            padding:12px;
+          "
+        >
+          <div class="center" style="font-weight:700;" id="final-message"></div>
+          <div class="center small" style="margin-top:6px;" id="final-message-reveal-word"></div>
+
+          <div class="center" style="margin-top:10px;">
+            <button class="btn" id="play-button">Play again</button>
+          </div>
+        </div>
+
+        <div class="small" style="margin-top:14px; opacity:.9;" id="hHint">
+          Hint: It’s a word from your game/dev list.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 </body>
 </html>
+
 
 
 
