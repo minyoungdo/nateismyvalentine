@@ -3081,9 +3081,12 @@ function gameTetris(root) {
 
     addRewards(heartsEarned, affectionEarned);
 
-    // mood reactions
-    if (score >= 1200 || lines >= 10) setMood("happy", { persist: true });
-    else if (score <= 250 && Math.random() < 0.35) setMood(
+   // mood reactions
+if (score >= 1200 || lines >= 10) {
+  setMood("happy", { persist: true });
+} else if (score <= 250 && Math.random() < 0.35) {
+  setMood("sad", { persist: true });
+}
 
 /***********************
   Mini Game: Hangman
@@ -3094,15 +3097,17 @@ function gameHangman(root) {
 
   root.innerHTML = "";
   const wrap = document.getElementById("hangmanWrap");
+
   if (!wrap) {
-    root.innerHTML = `<div class="game-frame">Missing #hangmanWrap HTML. Paste the HTML block once into your page.</div>`;
+    root.innerHTML = `<div class="game-frame">Missing #hangmanWrap HTML. Paste the Hangman HTML block once into your page.</div>`;
     isMiniGameRunning = false;
     return;
   }
+
   wrap.classList.remove("hidden");
   root.appendChild(wrap);
 
-  // Required elements (same IDs as your script)
+  // Elements (guarded)
   const wordElement = document.getElementById("word");
   const wrongLettersElement = document.getElementById("wrong-letters");
   const playAgainButton = document.getElementById("play-button");
@@ -3116,38 +3121,36 @@ function gameHangman(root) {
   const earnedAffectionEl = document.getElementById("aEarned");
   const restartBtn = document.getElementById("hRestartBtn");
 
+  // If any required element is missing, fail gracefully
+  const required = [
+    wordElement,
+    wrongLettersElement,
+    playAgainButton,
+    popup,
+    notification,
+    finalMessage,
+    finalMessageRevealWord
+  ];
+  if (required.some((x) => !x) || figureParts.length === 0) {
+    root.innerHTML = `<div class="game-frame">Hangman HTML is incomplete (missing IDs or .figure-part). Check the hangmanWrap block.</div>`;
+    isMiniGameRunning = false;
+    wrap.classList.add("hidden");
+    return;
+  }
+
   // Reset UI
   popup.style.display = "none";
   notification.classList.remove("show");
   wrongLettersElement.innerHTML = "";
-  earnedHeartsEl.innerText = "0";
-  earnedAffectionEl.innerText = "0";
+  if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
+  if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
   figureParts.forEach((p) => (p.style.display = "none"));
 
-  // Words (you can swap these anytime)
   const words = [
-    "application",
-    "programming",
-    "interface",
-    "wizard",
-    "element",
-    "prototype",
-    "callback",
-    "undefined",
-    "arguments",
-    "settings",
-    "selector",
-    "container",
-    "instance",
-    "response",
-    "console",
-    "constructor",
-    "token",
-    "function",
-    "return",
-    "length",
-    "type",
-    "node",
+    "application","programming","interface","wizard","element","prototype",
+    "callback","undefined","arguments","settings","selector","container",
+    "instance","response","console","constructor","token","function",
+    "return","length","type","node"
   ];
 
   let selectedWord = words[Math.floor(Math.random() * words.length)];
@@ -3160,22 +3163,14 @@ function gameHangman(root) {
 
   function showNotification() {
     notification.classList.add("show");
-    setTimeout(() => {
-      notification.classList.remove("show");
-    }, 1200);
+    setTimeout(() => notification.classList.remove("show"), 1200);
   }
 
   function displayWord() {
-    wordElement.innerHTML = `
-      ${selectedWord
-        .split("")
-        .map(
-          (letter) => `
-            <span class="h-letter">${correctLetters.includes(letter) ? letter : ""}</span>
-          `
-        )
-        .join("")}
-    `;
+    wordElement.innerHTML = selectedWord
+      .split("")
+      .map((letter) => `<span class="h-letter">${correctLetters.includes(letter) ? letter : ""}</span>`)
+      .join("");
 
     const innerWord = wordElement.innerText.replace(/\n/g, "");
     if (innerWord === selectedWord) {
@@ -3189,18 +3184,16 @@ function gameHangman(root) {
 
   function updateWrongLettersElement() {
     wrongLettersElement.innerHTML = `
-      ${wrongLetters.length > 0 ? "<p style='margin:0 0 6px 0; font-weight:700;'>Wrong</p>" : ""}
+      ${wrongLetters.length ? "<p style='margin:0 0 6px 0; font-weight:700;'>Wrong</p>" : ""}
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${wrongLetters.map((letter) => `<span class="h-wrong">${letter}</span>`).join("")}
+        ${wrongLetters.map((l) => `<span class="h-wrong">${l}</span>`).join("")}
       </div>
     `;
 
-    figureParts.forEach((part, index) => {
-      const errors = wrongLetters.length;
-      part.style.display = index < errors ? "block" : "none";
-    });
+    const errors = wrongLetters.length;
+    figureParts.forEach((part, idx) => (part.style.display = idx < errors ? "block" : "none"));
 
-    if (wrongLetters.length === figureParts.length) {
+    if (errors === figureParts.length) {
       finalMessage.innerText = "You lost 😭";
       finalMessageRevealWord.innerText = `The word was: ${selectedWord}`;
       popup.style.display = "block";
@@ -3212,7 +3205,7 @@ function gameHangman(root) {
   function payout(won) {
     payoutDone = true;
 
-    const mistakes = wrongLetters.length; // 0..6
+    const mistakes = wrongLetters.length;
     const remaining = figureParts.length - mistakes;
 
     let hearts = 0;
@@ -3229,36 +3222,32 @@ function gameHangman(root) {
     }
 
     addRewards(hearts, affection);
-    earnedHeartsEl.innerText = String(hearts);
-    earnedAffectionEl.innerText = String(affection);
+    if (earnedHeartsEl) earnedHeartsEl.innerText = String(hearts);
+    if (earnedAffectionEl) earnedAffectionEl.innerText = String(affection);
 
     maybePopup("afterGame");
   }
 
-  function resetGame(newWord) {
+  function resetGame() {
     playable = true;
     payoutDone = false;
 
     correctLetters.splice(0);
     wrongLetters.splice(0);
 
-    selectedWord = newWord || words[Math.floor(Math.random() * words.length)];
-
+    selectedWord = words[Math.floor(Math.random() * words.length)];
     popup.style.display = "none";
     wrongLettersElement.innerHTML = "";
-    earnedHeartsEl.innerText = "0";
-    earnedAffectionEl.innerText = "0";
-
+    if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
+    if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
     figureParts.forEach((p) => (p.style.display = "none"));
 
     displayWord();
     updateWrongLettersElement();
   }
 
-  // Key handler (saved so we can remove it on cleanup)
   function onKeyPress(e) {
-    if (disposed) return;
-    if (!playable) return;
+    if (disposed || !playable) return;
 
     const letter = (e.key || "").toLowerCase();
     if (letter < "a" || letter > "z") return;
@@ -3282,22 +3271,21 @@ function gameHangman(root) {
 
   window.addEventListener("keypress", onKeyPress);
 
-  // Buttons
   playAgainButton.onclick = () => {
     touchAction();
     resetGame();
   };
 
-  restartBtn.onclick = () => {
-    touchAction();
-    resetGame();
-  };
+  if (restartBtn) {
+    restartBtn.onclick = () => {
+      touchAction();
+      resetGame();
+    };
+  }
 
-  // Init
   displayWord();
   updateWrongLettersElement();
 
-  // Cleanup when switching games
   stopCurrentGame = () => {
     disposed = true;
     playable = false;
@@ -3307,464 +3295,6 @@ function gameHangman(root) {
   };
 }
 
-
-
-/***********************
-  TRIAL 2: Dakgalbi (timing)
-************************/
-function trialDakgalbi(root) {
-  $("gameTitle").innerText = "🍲 Trial: Make Perfect Dakgalbi";
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <div class="row">
-        <div>Press <span class="kbd">Space</span> when the heat is PERFECT • 3 rounds</div>
-        <div>Perfect: <strong id="dakPerfect">0</strong>/3</div>
-      </div>
-
-      <div style="margin-top:14px; padding:12px; border-radius:16px; background:rgba(255,255,255,.72); border:1px dashed rgba(255,77,136,.35);">
-        <div class="small" style="white-space:pre-line;">
-Heat meter moves back and forth.
-Hit the sweet spot (the PINK zone).
-No restart button if you fail.
-        </div>
-        <div style="height:18px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin-top:12px; position:relative;">
-          <div id="dakSweet" style="position:absolute; left:42%; width:16%; top:0; bottom:0; background:rgba(255,77,136,.35);"></div>
-          <div id="dakNeedle" style="position:absolute; width:10px; top:-6px; bottom:-6px; background:rgba(255,77,136,.95); border-radius:8px;"></div>
-        </div>
-        <div class="center small" style="margin-top:10px;" id="dakMsg"></div>
-      </div>
-
-      <div class="center" style="margin-top:12px;">
-        <button class="btn ghost" id="dakLeave">Leave</button>
-      </div>
-    </div>
-  `;
-
-  const needle = $("dakNeedle");
-  const msg = $("dakMsg");
-  const perfectEl = $("dakPerfect");
-
-  let running = true;
-  let rounds = 0;
-  let perfect = 0;
-
-  // meter
-  let x = 0.05;
-  let dir = 1;
-  let speed = 0.85;
-
-  function inSweetSpot(v) {
-    // sweet zone roughly 0.42..0.58
-    return v >= 0.42 && v <= 0.58;
-  }
-
-  function updateUI() {
-    needle.style.left = `${Math.round(x * 100)}%`;
-    perfectEl.innerText = String(perfect);
-  }
-
-  function nextRoundText() {
-    msg.innerText = `Round ${rounds + 1}/3… wait…`;
-  }
-
-  function tick() {
-    if (!running) return;
-    x += dir * speed * 0.012;
-    if (x >= 0.95) { x = 0.95; dir = -1; }
-    if (x <= 0.05) { x = 0.05; dir = 1; }
-    updateUI();
-    requestAnimationFrame(tick);
-  }
-
-  function press() {
-    if (!running) return;
-    touchAction();
-
-    rounds++;
-    const ok = inSweetSpot(x);
-
-    if (ok) {
-      perfect++;
-      msg.innerText = "Perfect heat 🔥💗";
-      setMood("happy", { persist: true });
-    } else {
-      msg.innerText = "Oops… too spicy / too cold 😭";
-      if (Math.random() < 0.35) setMood("sad", { persist: true });
-    }
-
-    updateUI();
-
-    if (rounds >= 3) {
-      end();
-    } else {
-      // increase difficulty slightly
-      speed += 0.18;
-      setTimeout(() => {
-        if (!running) return;
-        nextRoundText();
-      }, 650);
-    }
-  }
-
-  function end() {
-    running = false;
-
-    // Pass rule: 2 or 3 perfect
-    const passed = perfect >= 2;
-
-    msg.innerText = passed
-      ? "Dakgalbi is PERFECT. Minyoung is impressed 😳💗"
-      : "Dakgalbi is… questionable. Try again later 🥺";
-
-    // NO restart button. Only leave/back.
-    const leave = $("dakLeave");
-    leave.className = "btn";
-    leave.innerText = passed ? "Continue" : "Back to Mini Games";
-    leave.onclick = () => {
-      touchAction();
-      finishStageTrial(2, passed);
-      showView("minigames");
-    };
-
-    stopCurrentGame = () => {
-      running = false;
-      isTrialRunning = false;
-      isMiniGameRunning = false;
-      window.removeEventListener("keydown", onKey);
-    };
-  }
-
-  function onKey(e) {
-    if (e.code === "Space") {
-      e.preventDefault();
-      press();
-    }
-  }
-
-  $("dakLeave").addEventListener("click", () => {
-    touchAction();
-    // leaving counts as fail (no restart)
-    finishStageTrial(2, false);
-    showView("minigames");
-  });
-
-  window.addEventListener("keydown", onKey);
-  nextRoundText();
-  requestAnimationFrame(tick);
-}
-
-/***********************
-  TRIAL 3: Pixel Space Pinball (with aliendog.png floating)
-************************/
-function trialPinball(root) {
-  $("gameTitle").innerText = "🛸 Trial: Pixel Space Pinball";
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <div class="row">
-        <div>Flip: <span class="kbd">Z</span>/<span class="kbd">/</span> • Score target: <strong>900</strong></div>
-        <div>Score: <strong id="pbScore">0</strong></div>
-      </div>
-      <canvas class="canvas" id="pbCanvas" width="720" height="360"></canvas>
-      <div class="center small" style="margin-top:10px;" id="pbMsg"></div>
-
-      <div class="center" style="margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-        <button class="btn ghost" id="pbLeave">Leave</button>
-      </div>
-    </div>
-  `;
-
-  const canvas = $("pbCanvas");
-  const ctx = canvas.getContext("2d");
-  ctx.imageSmoothingEnabled = false;
-
-  const msg = $("pbMsg");
-  const scoreEl = $("pbScore");
-
-  let running = true;
-  let score = 0;
-  const target = 900;
-
-  // ball physics (simple)
-  const ball = { x: 360, y: 80, vx: 120, vy: 0, r: 6 };
-
-  // walls
-  const bounds = { left: 40, right: 680, top: 20, bottom: 340 };
-
-  // bumpers (stars)
-  const bumpers = [
-    { x: 220, y: 120, r: 16, pts: 90, emoji: "⭐" },
-    { x: 500, y: 120, r: 16, pts: 90, emoji: "⭐" },
-    { x: 360, y: 170, r: 18, pts: 120, emoji: "🌟" }
-  ];
-
-  // floating alien dog bumper
-  const alienDog = {
-    img: new Image(),
-    x: 360,
-    y: 250,
-    r: 18,
-    t: 0,
-    pts: 160
-  };
-  alienDog.img.src = `assets/characters/aliendog.png?v=${SPRITE_VERSION}`;
-
-  // paddles (simple rectangles)
-  const leftPad = { x: 250, y: 310, w: 80, h: 10, up: false };
-  const rightPad = { x: 390, y: 310, w: 80, h: 10, up: false };
-
-  // combo: hit 3 bumpers within window
-  let comboCount = 0;
-  let comboUntil = 0;
-
-  function addScore(n) {
-    score += n;
-    scoreEl.innerText = String(score);
-  }
-
-  function clampBall() {
-    if (ball.x - ball.r < bounds.left) { ball.x = bounds.left + ball.r; ball.vx *= -1; }
-    if (ball.x + ball.r > bounds.right) { ball.x = bounds.right - ball.r; ball.vx *= -1; }
-    if (ball.y - ball.r < bounds.top) { ball.y = bounds.top + ball.r; ball.vy *= -1; }
-    if (ball.y + ball.r > bounds.bottom) { ball.y = bounds.bottom - ball.r; ball.vy *= -0.7; } // soft bounce
-  }
-
-  function hitCircle(cx, cy, cr) {
-    const dx = ball.x - cx;
-    const dy = ball.y - cy;
-    const d = Math.sqrt(dx * dx + dy * dy);
-    return d <= (cr + ball.r);
-  }
-
-  function bounceFromCircle(cx, cy) {
-    const dx = ball.x - cx;
-    const dy = ball.y - cy;
-    const d = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
-    const nx = dx / d;
-    const ny = dy / d;
-
-    // push ball out
-    ball.x = cx + nx * (ball.r + 18);
-    ball.y = cy + ny * (ball.r + 18);
-
-    // reflect velocity
-    const dot = ball.vx * nx + ball.vy * ny;
-    ball.vx = ball.vx - 2 * dot * nx;
-    ball.vy = ball.vy - 2 * dot * ny;
-
-    // add a little juice
-    ball.vx *= 1.02;
-    ball.vy *= 1.02;
-  }
-
-  function hitRect(r) {
-    return (
-      ball.x + ball.r > r.x &&
-      ball.x - ball.r < r.x + r.w &&
-      ball.y + ball.r > r.y &&
-      ball.y - ball.r < r.y + r.h
-    );
-  }
-
-  function bounceFromPaddle(p) {
-    // simple upward kick
-    ball.y = p.y - ball.r - 1;
-    ball.vy = -Math.abs(ball.vy) - (p.up ? 260 : 180);
-    // sideways influence
-    const center = p.x + p.w / 2;
-    const dx = (ball.x - center) / (p.w / 2);
-    ball.vx += dx * 120;
-  }
-
-  function drawBG() {
-    // pixel starfield
-    ctx.fillStyle = "rgba(20, 14, 36, 0.95)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // twinkles
-    for (let i = 0; i < 70; i++) {
-      const x = (i * 97) % canvas.width;
-      const y = (i * 53) % canvas.height;
-      ctx.globalAlpha = 0.28;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(x, y, 2, 2);
-    }
-    ctx.globalAlpha = 1;
-
-    // border
-    ctx.strokeStyle = "rgba(255,77,136,.55)";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
-  }
-
-  function drawBumpers() {
-    bumpers.forEach((b) => {
-      ctx.font = "18px ui-monospace, system-ui";
-      ctx.fillText(b.emoji, b.x - 8, b.y + 8);
-      ctx.strokeStyle = "rgba(255,255,255,.18)";
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-      ctx.stroke();
-    });
-  }
-
-  function drawAlienDog() {
-    // float around a bit
-    const w = 36;
-    const h = 36;
-    if (alienDog.img.complete && alienDog.img.naturalWidth > 0) {
-      ctx.globalAlpha = 0.95;
-      ctx.drawImage(alienDog.img, alienDog.x - w / 2, alienDog.y - h / 2, w, h);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.font = "18px ui-monospace, system-ui";
-      ctx.fillText("👽🐶", alienDog.x - 14, alienDog.y + 6);
-    }
-  }
-
-  function drawPaddles() {
-    ctx.fillStyle = "rgba(255,77,136,.9)";
-    ctx.fillRect(leftPad.x, leftPad.y, leftPad.w, leftPad.h);
-    ctx.fillRect(rightPad.x, rightPad.y, rightPad.w, rightPad.h);
-  }
-
-  function drawBall() {
-    ctx.fillStyle = "rgba(255,255,255,.95)";
-    ctx.fillRect(Math.round(ball.x - ball.r), Math.round(ball.y - ball.r), ball.r * 2, ball.r * 2);
-  }
-
-  let last = performance.now();
-  function loop(now) {
-    if (!running) return;
-    const dt = (now - last) / 1000;
-    last = now;
-
-    // physics
-    const gravity = 620;
-    ball.vy += gravity * dt;
-
-    ball.x += ball.vx * dt;
-    ball.y += ball.vy * dt;
-
-    // float alien dog
-    alienDog.t += dt;
-    alienDog.x = 360 + Math.sin(alienDog.t * 1.3) * 120;
-    alienDog.y = 250 + Math.cos(alienDog.t * 1.1) * 20;
-
-    clampBall();
-
-    // bumpers collisions
-    for (const b of bumpers) {
-      if (hitCircle(b.x, b.y, b.r)) {
-        bounceFromCircle(b.x, b.y);
-        addScore(b.pts);
-
-        const nowMs = Date.now();
-        if (nowMs > comboUntil) {
-          comboCount = 0;
-          comboUntil = nowMs + 2500;
-        }
-        comboCount += 1;
-        if (comboCount >= 3) {
-          addScore(250);
-          comboCount = 0;
-          comboUntil = 0;
-          msg.innerText = "COMBO! ✨ +250";
-        } else {
-          msg.innerText = `Star hit! (+${b.pts})`;
-        }
-      }
-    }
-
-    // alien dog bumper
-    if (hitCircle(alienDog.x, alienDog.y, alienDog.r)) {
-      bounceFromCircle(alienDog.x, alienDog.y);
-      addScore(alienDog.pts);
-      msg.innerText = `Alien dog boost! (+${alienDog.pts}) 👽🐶`;
-    }
-
-    // paddles
-    leftPad.up = keys.z;
-    rightPad.up = keys.slash;
-
-    // raise paddles slightly when pressed
-    leftPad.y = leftPad.up ? 304 : 310;
-    rightPad.y = rightPad.up ? 304 : 310;
-
-    if (hitRect(leftPad) && ball.vy > 0) bounceFromPaddle(leftPad);
-    if (hitRect(rightPad) && ball.vy > 0) bounceFromPaddle(rightPad);
-
-    // if ball "drains" (falls below)
-    if (ball.y > bounds.bottom + 20) {
-      // fail condition (no restart button)
-      end(false);
-      return;
-    }
-
-    // win condition
-    if (score >= target) {
-      end(true);
-      return;
-    }
-
-    drawBG();
-    drawBumpers();
-    drawAlienDog();
-    drawPaddles();
-    drawBall();
-
-    requestAnimationFrame(loop);
-  }
-
-  const keys = { z: false, slash: false };
-
-  function onKeyDown(e) {
-    if (e.key === "z" || e.key === "Z") keys.z = true;
-    if (e.key === "/") keys.slash = true;
-  }
-  function onKeyUp(e) {
-    if (e.key === "z" || e.key === "Z") keys.z = false;
-    if (e.key === "/") keys.slash = false;
-  }
-
-  function end(passed) {
-    running = false;
-
-    msg.innerText = passed
-      ? "You cleared the pinball trial 💗"
-      : "Ball drained… try again later 🥺";
-
-    const leave = $("pbLeave");
-    leave.className = "btn";
-    leave.innerText = passed ? "Continue" : "Back to Mini Games";
-    leave.onclick = () => {
-      touchAction();
-      finishStageTrial(3, passed);
-      showView("minigames");
-    };
-
-    stopCurrentGame = () => {
-      running = false;
-      isTrialRunning = false;
-      isMiniGameRunning = false;
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-    };
-  }
-
-  $("pbLeave").addEventListener("click", () => {
-    touchAction();
-    finishStageTrial(3, false);
-    showView("minigames");
-  });
-
-  window.addEventListener("keydown", onKeyDown);
-  window.addEventListener("keyup", onKeyUp);
-
-  msg.innerText = "Hit bumpers, avoid draining. Target: 900";
-  requestAnimationFrame(loop);
-}
 
 /***********************
   TRIAL 4: Minyoung Party (cute graphics, competitive mean)
@@ -4395,6 +3925,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
