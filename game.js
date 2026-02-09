@@ -2208,440 +2208,328 @@ function gameDino(root) {
 }
 
 
-/* Game 6: Grow the Love Plants */
-function gameGrow(root) {
-  $("gameTitle").innerText = "🌱 Grow the Love Plants";
+/* Game X: Minyoung Quiz (no timer, capped rewards) */
+function gameQuiz(root) {
+  touchAction();
+  $("gameTitle").innerText = "🧠 Minyoung Quiz";
 
-  const MAX_HEARTS = 45;
-  const MAX_AFFECTION = 25;
+  // You can edit/replace these questions anytime
+  const quizData = [
+    {
+      question: "What is the capital of France?",
+      options: ["Paris", "London", "Berlin", "Madrid"],
+      answer: "Paris",
+    },
+    {
+      question: "What is the largest planet in our solar system?",
+      options: ["Mars", "Saturn", "Jupiter", "Neptune"],
+      answer: "Jupiter",
+    },
+    {
+      question: "Which country won the FIFA World Cup in 2018?",
+      options: ["Brazil", "Germany", "France", "Argentina"],
+      answer: "France",
+    },
+    {
+      question: "What is the tallest mountain in the world?",
+      options: ["Mount Everest", "K2", "Kangchenjunga", "Makalu"],
+      answer: "Mount Everest",
+    },
+    {
+      question: "Which is the largest ocean on Earth?",
+      options: ["Pacific Ocean", "Indian Ocean", "Atlantic Ocean", "Arctic Ocean"],
+      answer: "Pacific Ocean",
+    },
+    {
+      question: "What is the chemical symbol for gold?",
+      options: ["Au", "Ag", "Cu", "Fe"],
+      answer: "Au",
+    },
+    {
+      question: "Who painted the Mona Lisa?",
+      options: ["Pablo Picasso", "Vincent van Gogh", "Leonardo da Vinci", "Michelangelo"],
+      answer: "Leonardo da Vinci",
+    },
+    {
+      question: "Which planet is known as the Red Planet?",
+      options: ["Mars", "Venus", "Mercury", "Uranus"],
+      answer: "Mars",
+    },
+    {
+      question: "What is the largest species of shark?",
+      options: ["Great White Shark", "Whale Shark", "Tiger Shark", "Hammerhead Shark"],
+      answer: "Whale Shark",
+    },
+    {
+      question: "Which animal is known as the King of the Jungle?",
+      options: ["Lion", "Tiger", "Elephant", "Giraffe"],
+      answer: "Lion",
+    },
+    {
+      question: "What is the capital of Japan?",
+      options: ["Tokyo", "Kyoto", "Osaka", "Nagoya"],
+      answer: "Tokyo",
+    },
+    {
+      question: "Which element has the atomic number 1?",
+      options: ["Helium", "Oxygen", "Hydrogen", "Carbon"],
+      answer: "Hydrogen",
+    },
+    {
+      question: "Who wrote 'Romeo and Juliet'?",
+      options: ["Charles Dickens", "William Shakespeare", "Mark Twain", "Leo Tolstoy"],
+      answer: "William Shakespeare",
+    },
+    {
+      question: "What is the smallest country in the world?",
+      options: ["Monaco", "San Marino", "Liechtenstein", "Vatican City"],
+      answer: "Vatican City",
+    },
+    {
+      question: "Which planet is known for its rings?",
+      options: ["Venus", "Saturn", "Jupiter", "Neptune"],
+      answer: "Saturn",
+    },
+    {
+      question: "Who discovered penicillin?",
+      options: ["Marie Curie", "Alexander Fleming", "Louis Pasteur", "Isaac Newton"],
+      answer: "Alexander Fleming",
+    },
+    {
+      question: "Which continent is the Sahara Desert located on?",
+      options: ["Asia", "Africa", "Australia", "Europe"],
+      answer: "Africa",
+    },
+    {
+      question: "What is the main ingredient in guacamole?",
+      options: ["Tomato", "Avocado", "Onion", "Pepper"],
+      answer: "Avocado",
+    },
+    {
+      question: "Which country is known as the Land of the Rising Sun?",
+      options: ["China", "South Korea", "Thailand", "Japan"],
+      answer: "Japan",
+    },
+  ];
 
   root.innerHTML = `
     <div class="game-frame">
       <div class="row">
-        <div>Tap FAST • play forever</div>
-        <div>Growth: <strong id="growScore">0</strong>%</div>
+        <div>Answer questions • no timer • rewards capped</div>
+        <div>Score: <strong id="quizScore">0</strong></div>
       </div>
 
-      <div style="height:200px; display:flex; align-items:flex-end; justify-content:center;">
-        <div id="plant" style="
-          width:60px;
-          height:20px;
-          border-radius:20px;
-          background:linear-gradient(#ff7ab6,#ff4d88);
-          transition:height .05s;
-        "></div>
+      <div id="quiz" style="margin-top:12px;"></div>
+
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+        <button class="btn" id="submit">Submit</button>
+        <button class="btn ghost" id="retry" style="display:none;">Retry</button>
+        <button class="btn ghost" id="showAnswer" style="display:none;">Show answers</button>
       </div>
 
-      <div class="center">
-        <button id="growBtn" class="btn">WATER 🌊</button>
-      </div>
-
-      <div class="center small" id="growMsg"></div>
+      <div class="center small" style="margin-top:12px;" id="result"></div>
     </div>
   `;
 
-  let growth = 0;
-  let running = true;
-  let finalized = false;
+  const quizContainer = $("quiz");
+  const resultContainer = $("result");
+  const submitButton = $("submit");
+  const retryButton = $("retry");
+  const showAnswerButton = $("showAnswer");
 
-  const plant = $("plant");
-  const msg = $("growMsg");
+  let currentQuestion = 0;
+  let score = 0;
+  let incorrectAnswers = [];
+  let finished = false;
 
-  finalizeCurrentGame = () => {
-    if (finalized) return;
-    finalized = true;
+  function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+  }
 
-    const hearts = clamp(Math.floor(growth / 2), 8, MAX_HEARTS);
-    const affection = clamp(Math.floor(growth / 4), 2, MAX_AFFECTION);
-    addRewards(hearts, affection);
+  function displayQuestion() {
+    const questionData = quizData[currentQuestion];
 
-    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
-    speak("Minyoung: “Stop… why is that so cute.”");
+    const questionElement = document.createElement("div");
+    questionElement.className = "question";
+    questionElement.style.marginBottom = "10px";
+    questionElement.style.whiteSpace = "pre-line";
+    questionElement.innerHTML = `<strong>${currentQuestion + 1}.</strong> ${questionData.question}`;
 
-    if (growth > 60) setMood("happy");
-    maybePopup("afterGame");
-  };
+    const optionsElement = document.createElement("div");
+    optionsElement.className = "options";
+    optionsElement.style.display = "grid";
+    optionsElement.style.gap = "8px";
 
-  $("growBtn").onclick = () => {
-    if (!running) return;
+    const shuffledOptions = [...questionData.options];
+    shuffleArray(shuffledOptions);
+
+    for (let i = 0; i < shuffledOptions.length; i++) {
+      const option = document.createElement("label");
+      option.className = "option";
+      option.style.display = "flex";
+      option.style.gap = "8px";
+      option.style.alignItems = "center";
+      option.style.padding = "10px";
+      option.style.borderRadius = "12px";
+      option.style.border = "1px dashed rgba(255,77,136,.35)";
+      option.style.background = "rgba(255,255,255,.65)";
+      option.style.cursor = "pointer";
+
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "quiz";
+      radio.value = shuffledOptions[i];
+
+      const optionText = document.createTextNode(shuffledOptions[i]);
+
+      option.appendChild(radio);
+      option.appendChild(optionText);
+      optionsElement.appendChild(option);
+    }
+
+    quizContainer.innerHTML = "";
+    quizContainer.appendChild(questionElement);
+    quizContainer.appendChild(optionsElement);
+
+    $("quizScore").innerText = String(score);
+  }
+
+  function checkAnswer() {
+    if (finished) return;
     touchAction();
 
-    growth += 2 + Math.random() * 2;
-    plant.style.height = `${20 + growth * 2}px`;
-    $("growScore").innerText = Math.floor(growth);
-
-    const projected = clamp(Math.floor(growth / 2), 8, MAX_HEARTS);
-    msg.innerText =
-      projected >= MAX_HEARTS
-        ? `Max rewards reached (${MAX_HEARTS}). Keep watering 😌`
-        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
-  };
-
-  stopCurrentGame = () => {
-    running = false;
-    isMiniGameRunning = false;
-    finalizeCurrentGame = null;
-  };
-}
-
-function gameSort(root) {
-  $("gameTitle").innerText = "🎁 Gift Sorting Panic";
-
-  const MAX_HEARTS = 50;
-  const MAX_AFFECTION = 30;
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <div class="row">
-        <div>Click good gifts. Avoid cursed ones.</div>
-        <div>Score: <strong id="sortScore">0</strong></div>
-      </div>
-
-      <div id="sortField" style="
-        position:relative;
-        height:340px;
-        border-radius:16px;
-        background:rgba(255,255,255,.7);
-        overflow:hidden;"></div>
-
-      <div class="center small" id="sortMsg" style="margin-top:10px;"></div>
-    </div>
-  `;
-
-  const good = ["💗","🎀","🍓","🧸","☕"];
-  const bad = ["🧅","💀","📉","🗑️"];
-
-  let score = 0;
-  let running = true;
-  let finalized = false;
-
-  const field = $("sortField");
-  const msg = $("sortMsg");
-
-  finalizeCurrentGame = () => {
-    if (finalized) return;
-    finalized = true;
-
-    const hearts = clamp(score, 6, MAX_HEARTS);
-    const affection = clamp(Math.floor(Math.max(0, score) / 3), 2, MAX_AFFECTION);
-    addRewards(hearts, affection);
-
-    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
-    speak("Minyoung: “You panic-gifted perfectly.”");
-    maybePopup("afterGame");
-  };
-
-  function spawn() {
-    if (!running) return;
-
-    const el = document.createElement("div");
-    const isBad = Math.random() < 0.35;
-
-    el.innerText = isBad
-      ? bad[Math.floor(Math.random() * bad.length)]
-      : good[Math.floor(Math.random() * good.length)];
-
-    el.style.position = "absolute";
-    el.style.left = `${Math.random() * 90}%`;
-    el.style.top = "-30px";
-    el.style.fontSize = "28px";
-    el.style.cursor = "pointer";
-
-    el.onclick = () => {
-      if (!running) return;
-      touchAction();
-
-      if (isBad) {
-        score -= 4;
-        setMood("sad");
-      } else {
-        score += 6;
-      }
-
-      $("sortScore").innerText = score;
-      el.remove();
-
-      const projected = clamp(score, 6, MAX_HEARTS);
-      msg.innerText =
-        projected >= MAX_HEARTS
-          ? `Max rewards reached (${MAX_HEARTS}). Keep sorting 😌`
-          : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
-    };
-
-    field.appendChild(el);
-
-    let y = -30;
-    const fall = setInterval(() => {
-      y += 4;
-      el.style.top = `${y}px`;
-      if (y > 360) {
-        clearInterval(fall);
-        el.remove();
-      }
-    }, 16);
-  }
-
-  const spawner = setInterval(spawn, 450);
-
-  stopCurrentGame = () => {
-    running = false;
-    isMiniGameRunning = false;
-    finalizeCurrentGame = null;
-    clearInterval(spawner);
-  };
-}
-
-function gameZoom(root) {
-  $("gameTitle").innerText = "🐶 Fudge Zoomies";
-
-  const MAX_HEARTS = 60;
-  const MAX_AFFECTION = 28;
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <canvas id="zoomCanvas" width="720" height="320" class="canvas"></canvas>
-      <div class="center small">Move ← → • survive forever</div>
-      <div class="center small" id="zoomMsg" style="margin-top:8px;"></div>
-    </div>
-  `;
-
-  const c = $("zoomCanvas");
-  const ctx = c.getContext("2d");
-  const msg = $("zoomMsg");
-
-  let playerX = 360;
-  let score = 0;
-  let running = true;
-  let finalized = false;
-
-  const dogs = [];
-
-  finalizeCurrentGame = () => {
-    if (finalized) return;
-    finalized = true;
-
-    const hearts = clamp(Math.floor(score / 18), 10, MAX_HEARTS);
-    const affection = clamp(Math.floor(score / 55), 6, MAX_AFFECTION);
-    addRewards(hearts, affection);
-
-    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
-    speak("Minyoung: “That dog has zero brakes.”");
-    maybePopup("afterGame");
-  };
-
-  function spawn() {
-    dogs.push({
-      x: -40,
-      y: 40 + Math.random() * 240,
-      speed: 4 + Math.random() * 3
-    });
-  }
-
-  const spawner = setInterval(spawn, 900);
-
-  function loop() {
-    if (!running) return;
-
-    ctx.clearRect(0, 0, c.width, c.height);
-
-    ctx.font = "22px ui-monospace, system-ui";
-    ctx.fillText("💗", playerX, 280);
-
-    dogs.forEach(d => {
-      d.x += d.speed;
-      ctx.fillText("🐶", d.x, d.y);
-
-      // bonk = score penalty instead of ending
-      if (Math.abs(d.x - playerX) < 18 && Math.abs(d.y - 280) < 18) {
-        score = Math.max(0, score - 80);
-        if (Math.random() < 0.35) setMood("sad", { persist: true });
-      }
-    });
-
-    // cleanup offscreen dogs
-    for (let i = dogs.length - 1; i >= 0; i--) {
-      if (dogs[i].x > 800) dogs.splice(i, 1);
+    const selectedOption = document.querySelector('input[name="quiz"]:checked');
+    if (!selectedOption) {
+      resultContainer.innerText = "Pick an answer first 🙂";
+      return;
     }
 
-    score++;
-    const projected = clamp(Math.floor(score / 18), 10, MAX_HEARTS);
-    msg.innerText =
-      projected >= MAX_HEARTS
-        ? `Max rewards reached (${MAX_HEARTS}). Keep dodging 😌`
-        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+    const answer = selectedOption.value;
+    if (answer === quizData[currentQuestion].answer) {
+      score++;
+    } else {
+      incorrectAnswers.push({
+        question: quizData[currentQuestion].question,
+        incorrectAnswer: answer,
+        correctAnswer: quizData[currentQuestion].answer,
+      });
+    }
 
-    requestAnimationFrame(loop);
-  }
+    currentQuestion++;
 
-  function onKey(e) {
-    if (e.key === "ArrowLeft") playerX = Math.max(20, playerX - 25);
-    if (e.key === "ArrowRight") playerX = Math.min(700, playerX + 25);
-  }
-  window.addEventListener("keydown", onKey);
-
-  stopCurrentGame = () => {
-    running = false;
-    isMiniGameRunning = false;
-    finalizeCurrentGame = null;
-    clearInterval(spawner);
-    window.removeEventListener("keydown", onKey);
-  };
-
-  loop();
-}
-
-function gameBalance(root) {
-  $("gameTitle").innerText = "💌 Balance the Love Meter";
-
-  const MAX_HEARTS = 40;
-  const MAX_AFFECTION = 24;
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <div style="height:20px;background:#eee;border-radius:10px;position:relative;">
-        <div id="needle" style="position:absolute;width:8px;height:24px;background:#ff4d88;"></div>
-        <div style="position:absolute;left:47%;top:0;bottom:0;width:6%;background:rgba(255,77,136,.25);"></div>
-      </div>
-      <div class="center small" style="margin-top:10px;">Tap ← → to keep it centered • infinite</div>
-      <div class="center small" id="balMsg" style="margin-top:8px;"></div>
-    </div>
-  `;
-
-  let pos = 50;
-  let streak = 0;
-  let running = true;
-  let finalized = false;
-
-  const needle = $("needle");
-  const msg = $("balMsg");
-
-  finalizeCurrentGame = () => {
-    if (finalized) return;
-    finalized = true;
-
-    const hearts = clamp(Math.floor(streak / 18) + 12, 12, MAX_HEARTS);
-    const affection = clamp(Math.floor(streak / 40) + 6, 6, MAX_AFFECTION);
-    addRewards(hearts, affection);
-
-    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
-    speak("Minyoung: “Relationships are about balance…”");
-    maybePopup("afterGame");
-  };
-
-  function drift() {
-    pos += Math.random() * 6 - 3;
-    pos = clamp(pos, 0, 100);
-    needle.style.left = `${pos}%`;
-
-    const inCenter = pos >= 47 && pos <= 53;
-    if (inCenter) streak++;
-    else streak = Math.max(0, streak - 2);
-
-    const projected = clamp(Math.floor(streak / 18) + 12, 12, MAX_HEARTS);
-    msg.innerText =
-      projected >= MAX_HEARTS
-        ? `Max rewards reached (${MAX_HEARTS}). Keep balancing 😌`
-        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
-  }
-
-  const driftInt = setInterval(drift, 120);
-
-  function onKey(e) {
-    if (e.key === "ArrowLeft") pos -= 6;
-    if (e.key === "ArrowRight") pos += 6;
-  }
-  window.addEventListener("keydown", onKey);
-
-  stopCurrentGame = () => {
-    running = false;
-    isMiniGameRunning = false;
-    finalizeCurrentGame = null;
-    clearInterval(driftInt);
-    window.removeEventListener("keydown", onKey);
-  };
-}
-
-function gameCake(root) {
-  $("gameTitle").innerText = "🍰 Cake Stack Chaos";
-
-  const MAX_HEARTS = 50;
-  const MAX_AFFECTION = 25;
-
-  root.innerHTML = `
-    <div class="game-frame">
-      <canvas id="cakeCanvas" width="720" height="320" class="canvas"></canvas>
-      <div class="center small">Press SPACE to drop layers • infinite</div>
-      <div class="center small" id="cakeMsg" style="margin-top:8px;"></div>
-    </div>
-  `;
-
-  const c = $("cakeCanvas");
-  const ctx = c.getContext("2d");
-  const msg = $("cakeMsg");
-
-  let layers = [];
-  let x = 0;
-  let dir = 4;
-  let running = true;
-  let finalized = false;
-
-  finalizeCurrentGame = () => {
-    if (finalized) return;
-    finalized = true;
-
-    const stack = layers.length;
-    const hearts = clamp(10 + stack * 6, 10, MAX_HEARTS);
-    const affection = clamp(6 + stack * 2, 6, MAX_AFFECTION);
-    addRewards(hearts, affection);
-
-    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
-    speak("Minyoung: “That cake is dangerously tall…”");
-    maybePopup("afterGame");
-  };
-
-  function loop() {
-    if (!running) return;
-
-    ctx.clearRect(0, 0, 720, 320);
-    ctx.font = "26px ui-monospace, system-ui";
-
-    x += dir;
-    if (x < 0 || x > 660) dir *= -1;
-
-    ctx.fillText("🎂", x, 60);
-
-    layers.forEach((l, i) => {
-      ctx.fillText("🍰", l.x, 260 - i * 28);
-    });
-
-    const projected = clamp(10 + layers.length * 6, 10, MAX_HEARTS);
-    msg.innerText =
-      projected >= MAX_HEARTS
-        ? `Max rewards reached (${MAX_HEARTS}). Keep stacking 😌`
-        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
-
-    requestAnimationFrame(loop);
-  }
-
-  function onKey(e) {
-    if (e.code === "Space") {
-      e.preventDefault();
-      touchAction();
-      layers.push({ x });
-      if (layers.length % 5 === 0) setMood("happy", { persist: true });
+    if (currentQuestion < quizData.length) {
+      resultContainer.innerText = "";
+      displayQuestion();
+      $("quizScore").innerText = String(score);
+    } else {
+      displayResult();
     }
   }
-  window.addEventListener("keydown", onKey);
+
+  function displayResult() {
+    finished = true;
+
+    // IMPORTANT: end mini game state
+    isMiniGameRunning = false;
+
+    quizContainer.style.display = "none";
+    submitButton.style.display = "none";
+    retryButton.style.display = "inline-block";
+    showAnswerButton.style.display = "inline-block";
+
+    const total = quizData.length;
+    const pct = total ? score / total : 0;
+
+    // Rewards (capped)
+    // You can tune these numbers:
+    const heartsEarnedRaw = Math.round(score * 6);       // 0..114
+    const affectionEarnedRaw = Math.round(score * 2.2);  // 0..42
+
+    const MAX_HEARTS = 60;      // <- max hearts for this game
+    const MAX_AFFECTION = 28;   // <- max affection for this game
+
+    const heartsEarned = clamp(heartsEarnedRaw, 5, MAX_HEARTS);
+    const affectionEarned = clamp(affectionEarnedRaw, 2, MAX_AFFECTION);
+
+    addRewards(heartsEarned, affectionEarned);
+
+    resultContainer.innerHTML =
+      `You scored <strong>${score}</strong> out of <strong>${total}</strong>.<br>` +
+      `Result: +${heartsEarned} hearts 💗`;
+
+    if (pct >= 0.75) {
+      setMood("happy", { persist: true });
+      speak("Minyoung: “Okay brainy… that was hot.” 😳💗");
+    } else if (pct <= 0.3 && Math.random() < 0.35) {
+      setMood("sad", { persist: true });
+      speak("Minyoung: “It’s okay… I still like you.” 🥺");
+    } else {
+      speak("Minyoung: “Not bad. Do it again.”");
+    }
+
+    maybePopup("afterGame");
+  }
+
+  function retryQuiz() {
+    touchAction();
+    currentQuestion = 0;
+    score = 0;
+    incorrectAnswers = [];
+    finished = false;
+
+    quizContainer.style.display = "block";
+    submitButton.style.display = "inline-block";
+    retryButton.style.display = "none";
+    showAnswerButton.style.display = "none";
+    resultContainer.innerHTML = "";
+
+    // Since we restarted, lock mini game again
+    isMiniGameRunning = true;
+
+    displayQuestion();
+  }
+
+  function showAnswer() {
+    touchAction();
+
+    quizContainer.style.display = "none";
+    submitButton.style.display = "none";
+    retryButton.style.display = "inline-block";
+    showAnswerButton.style.display = "none";
+
+    let incorrectAnswersHtml = "";
+    for (let i = 0; i < incorrectAnswers.length; i++) {
+      incorrectAnswersHtml += `
+        <p style="margin:10px 0; padding:10px; border-radius:12px; border:1px dashed rgba(255,77,136,.35); background:rgba(255,255,255,.65);">
+          <strong>Q:</strong> ${incorrectAnswers[i].question}<br>
+          <strong>You:</strong> ${incorrectAnswers[i].incorrectAnswer}<br>
+          <strong>Correct:</strong> ${incorrectAnswers[i].correctAnswer}
+        </p>
+      `;
+    }
+
+    resultContainer.innerHTML = `
+      <p>You scored <strong>${score}</strong> out of <strong>${quizData.length}</strong>.</p>
+      <p><strong>Incorrect Answers:</strong></p>
+      ${incorrectAnswersHtml || "<p>None 💗</p>"}
+    `;
+  }
+
+  submitButton.addEventListener("click", checkAnswer);
+  retryButton.addEventListener("click", retryQuiz);
+  showAnswerButton.addEventListener("click", showAnswer);
 
   stopCurrentGame = () => {
-    running = false;
     isMiniGameRunning = false;
-    finalizeCurrentGame = null;
-    window.removeEventListener("keydown", onKey);
+    finished = true;
   };
 
-  loop();
+  displayQuestion();
 }
+
 
 /***********************
   TRIAL 2: Dakgalbi (timing)
@@ -3729,6 +3617,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
