@@ -2821,10 +2821,11 @@ function gameTetris(root) {
   };
 }
 
-
-  
 /***********************
-  Mini Game: Hangman
+  Mini Game: Hangman (UPDATED)
+  - Shows underscores for unguessed letters
+  - Adds clickable on-screen keyboard
+  - Keeps typing support
 ************************/
 function gameHangman(root) {
   touchAction();
@@ -2856,6 +2857,9 @@ function gameHangman(root) {
   const earnedAffectionEl = document.getElementById("aEarned");
   const restartBtn = document.getElementById("hRestartBtn");
 
+  // NEW: keyboard mount
+  const kbdMount = document.getElementById("hKeyboard");
+
   // If any required element is missing, fail gracefully
   const required = [
     wordElement,
@@ -2864,7 +2868,8 @@ function gameHangman(root) {
     popup,
     notification,
     finalMessage,
-    finalMessageRevealWord
+    finalMessageRevealWord,
+    kbdMount
   ];
   if (required.some((x) => !x) || figureParts.length === 0) {
     root.innerHTML = `<div class="game-frame">Hangman HTML is incomplete (missing IDs or .figure-part). Check the hangmanWrap block.</div>`;
@@ -2873,20 +2878,11 @@ function gameHangman(root) {
     return;
   }
 
-  // Reset UI
-  popup.style.display = "none";
-  notification.classList.remove("show");
-  wrongLettersElement.innerHTML = "";
-  if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
-  if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
-  figureParts.forEach((p) => (p.style.display = "none"));
-
-const words = [
-  "romance","adore","devotion","sweetheart","passion","darling",
-  "forever","cuddle","affection","heartbeat","intimacy","embrace",
-  "Totobop","Afi","Ddiddicop","soulmate","together","love"
-];
-
+  const words = [
+    "romance","adore","devotion","sweetheart","passion","darling",
+    "forever","cuddle","affection","heartbeat","intimacy","embrace",
+    "Totobop","Afi","Ddiddicop","soulmate","together","love"
+  ];
 
   let selectedWord = words[Math.floor(Math.random() * words.length)];
   let playable = true;
@@ -2896,19 +2892,91 @@ const words = [
   let disposed = false;
   let payoutDone = false;
 
+  // -------- helpers --------
+  const normalizeWord = (w) => String(w || "").toLowerCase();
+  const normalizedSelected = () => normalizeWord(selectedWord);
+
   function showNotification() {
     notification.classList.add("show");
     setTimeout(() => notification.classList.remove("show"), 1200);
   }
 
-  function displayWord() {
-    wordElement.innerHTML = selectedWord
-      .split("")
-      .map((letter) => `<span class="h-letter">${correctLetters.includes(letter) ? letter : ""}</span>`)
+  function alreadyGuessed(letter) {
+    return correctLetters.includes(letter) || wrongLetters.includes(letter);
+  }
+
+  function setKeyState(letter) {
+    const btn = kbdMount.querySelector(`[data-letter="${letter}"]`);
+    if (!btn) return;
+
+    btn.disabled = true;
+    btn.classList.remove("is-correct", "is-wrong");
+
+    if (normalizedSelected().includes(letter)) btn.classList.add("is-correct");
+    else btn.classList.add("is-wrong");
+  }
+
+  function resetKeyboard() {
+    kbdMount.querySelectorAll("button[data-letter]").forEach((b) => {
+      b.disabled = false;
+      b.classList.remove("is-correct", "is-wrong");
+    });
+  }
+
+  function buildKeyboard() {
+    // simple 3-row layout to match “cute keyboard” vibe
+    const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+
+    kbdMount.innerHTML = rows
+      .map((row) => {
+        const keys = row
+          .split("")
+          .map(
+            (ch) =>
+              `<button type="button" class="h-kbdKey btn kbd" data-letter="${ch}" aria-label="letter ${ch}">${ch.toUpperCase()}</button>`
+          )
+          .join("");
+        return `<div class="h-kbdRow">${keys}</div>`;
+      })
       .join("");
 
-    const innerWord = wordElement.innerText.replace(/\n/g, "");
-    if (innerWord === selectedWord) {
+    // click handler (delegated)
+    const onKbdClick = (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      const letter = t.getAttribute("data-letter");
+      if (!letter) return;
+      handleGuess(letter);
+    };
+
+    // store for cleanup
+    buildKeyboard._onKbdClick = onKbdClick;
+    kbdMount.addEventListener("click", onKbdClick);
+  }
+
+  function unbindKeyboard() {
+    if (buildKeyboard._onKbdClick) {
+      kbdMount.removeEventListener("click", buildKeyboard._onKbdClick);
+      buildKeyboard._onKbdClick = null;
+    }
+  }
+
+  function displayWord() {
+    const target = normalizedSelected();
+
+    // Show underscores for unknown letters
+    wordElement.innerHTML = target
+      .split("")
+      .map((letter) => {
+        const shown = correctLetters.includes(letter) ? letter.toUpperCase() : "_";
+        // use &nbsp; to keep spacing consistent
+        return `<span class="h-letter">${shown}</span>`;
+      })
+      .join("");
+
+    // win check (compare guessed letters against target)
+    const won = target.split("").every((ch) => correctLetters.includes(ch));
+    if (won) {
       finalMessage.innerText = "You won 💗";
       finalMessageRevealWord.innerText = "";
       popup.style.display = "block";
@@ -2921,7 +2989,7 @@ const words = [
     wrongLettersElement.innerHTML = `
       ${wrongLetters.length ? "<p style='margin:0 0 6px 0; font-weight:700;'>Wrong</p>" : ""}
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${wrongLetters.map((l) => `<span class="h-wrong">${l}</span>`).join("")}
+        ${wrongLetters.map((l) => `<span class="h-wrong">${l.toUpperCase()}</span>`).join("")}
       </div>
     `;
 
@@ -2963,6 +3031,28 @@ const words = [
     maybePopup("afterGame");
   }
 
+  function handleGuess(rawLetter) {
+    if (disposed || !playable) return;
+
+    const letter = (rawLetter || "").toLowerCase();
+    if (letter < "a" || letter > "z") return;
+
+    if (alreadyGuessed(letter)) {
+      showNotification();
+      return;
+    }
+
+    if (normalizedSelected().includes(letter)) {
+      correctLetters.push(letter);
+      displayWord();
+    } else {
+      wrongLetters.push(letter);
+      updateWrongLettersElement();
+    }
+
+    setKeyState(letter);
+  }
+
   function resetGame() {
     playable = true;
     payoutDone = false;
@@ -2971,12 +3061,14 @@ const words = [
     wrongLetters.splice(0);
 
     selectedWord = words[Math.floor(Math.random() * words.length)];
+
     popup.style.display = "none";
     wrongLettersElement.innerHTML = "";
     if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
     if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
     figureParts.forEach((p) => (p.style.display = "none"));
 
+    resetKeyboard();
     displayWord();
     updateWrongLettersElement();
   }
@@ -2987,23 +3079,18 @@ const words = [
     const letter = (e.key || "").toLowerCase();
     if (letter < "a" || letter > "z") return;
 
-    if (selectedWord.includes(letter)) {
-      if (!correctLetters.includes(letter)) {
-        correctLetters.push(letter);
-        displayWord();
-      } else {
-        showNotification();
-      }
-    } else {
-      if (!wrongLetters.includes(letter)) {
-        wrongLetters.push(letter);
-        updateWrongLettersElement();
-      } else {
-        showNotification();
-      }
-    }
+    handleGuess(letter);
   }
 
+  // ---------- init UI ----------
+  popup.style.display = "none";
+  notification.classList.remove("show");
+  wrongLettersElement.innerHTML = "";
+  if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
+  if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
+  figureParts.forEach((p) => (p.style.display = "none"));
+
+  buildKeyboard();
   window.addEventListener("keypress", onKeyPress);
 
   playAgainButton.onclick = () => {
@@ -3025,6 +3112,7 @@ const words = [
     disposed = true;
     playable = false;
     window.removeEventListener("keypress", onKeyPress);
+    unbindKeyboard();
     wrap.classList.add("hidden");
     isMiniGameRunning = false;
   };
@@ -3660,6 +3748,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
