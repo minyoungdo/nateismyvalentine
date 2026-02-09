@@ -165,21 +165,85 @@
     </section>
   </main>
 
-  <!-- Optional background music file -->
-  <audio id="bgMusic" loop>
-    <source src="assets/music/cute-arcade.mp3" type="audio/mpeg" />
-  </audio>
+ <!-- Tetris -->
+<div id="tetrisWrap" class="hidden">
+  <div class="game-frame">
+    <div class="row">
+      <div class="small">
+        Move: <span class="kbd">←</span><span class="kbd">→</span> • Rotate: <span class="kbd">↑</span>
+        • Drop: <span class="kbd">↓</span> • Pause: <span class="kbd">Esc</span>
+      </div>
+      <div class="small">
+        Score: <strong id="tScore">0</strong>
+      </div>
+    </div>
 
-  <script>
-    // Start music on the first user interaction (browsers block true autoplay with sound)
-    document.addEventListener("pointerdown", () => {
-      const bgMusic = document.getElementById("bgMusic");
-      if (!bgMusic) return;
-      bgMusic.play().catch(() => {});
-    }, { once: true });
-  </script>
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; align-items:flex-start;">
+      <!-- Board -->
+      <div
+        id="tCanvas"
+        style="
+          position:relative;
+          width:200px;
+          height:440px;
+          border-radius:16px;
+          border:1px dashed rgba(255,77,136,.35);
+          background:rgba(255,255,255,.65);
+          overflow:hidden;
+        "
+      ></div>
+
+      <!-- Side info -->
+      <div
+        style="
+          min-width:220px;
+          flex:1;
+          border-radius:16px;
+          border:1px dashed rgba(255,77,136,.35);
+          background:rgba(255,255,255,.65);
+          padding:12px;
+        "
+      >
+        <div class="small" style="margin-bottom:6px;"><strong>Next</strong></div>
+        <div
+          id="tNext"
+          style="
+            position:relative;
+            width:120px;
+            height:120px;
+            border-radius:14px;
+            border:1px dashed rgba(255,77,136,.25);
+            background:rgba(255,255,255,.55);
+            overflow:hidden;
+          "
+        ></div>
+
+        <div style="margin-top:12px; display:grid; gap:6px;">
+          <div class="small">Level: <strong id="tLevel">1</strong></div>
+          <div class="small">Lines: <strong id="tLines">0</strong></div>
+          <div class="small">Time: <strong id="tTime">0</strong></div>
+        </div>
+
+        <div class="center small" style="margin-top:12px; white-space:pre-line;" id="tMsg">
+          Press Start to begin.
+        </div>
+
+        <div class="center" style="margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button class="btn" id="tStartBtn">Start</button>
+          <button class="btn ghost" id="tRestartBtn" style="display:none;">Restart</button>
+        </div>
+
+        <div class="center small" style="margin-top:10px;">
+          Rewards only count when you finish a run (Game Over or Quit).
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
+
 
 
 
