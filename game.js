@@ -3087,7 +3087,9 @@ if (score >= 1200 || lines >= 10) {
 } else if (score <= 250 && Math.random() < 0.35) {
   setMood("sad", { persist: true });
 }
+  }
 
+  
 /***********************
   Mini Game: Hangman
 ************************/
@@ -3146,12 +3148,12 @@ function gameHangman(root) {
   if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
   figureParts.forEach((p) => (p.style.display = "none"));
 
-  const words = [
-    "application","programming","interface","wizard","element","prototype",
-    "callback","undefined","arguments","settings","selector","container",
-    "instance","response","console","constructor","token","function",
-    "return","length","type","node"
-  ];
+const words = [
+  "romance","adore","devotion","sweetheart","passion","darling",
+  "forever","cuddle","affection","heartbeat","intimacy","embrace",
+  "Totobop","Afi","Ddiddicop","soulmate","together","love"
+];
+
 
   let selectedWord = words[Math.floor(Math.random() * words.length)];
   let playable = true;
@@ -3925,6 +3927,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
