@@ -1503,7 +1503,7 @@ function startGame(key) {
 
   // NEW games
   if (key === "quiz") return gameQuiz(area);
-  if (key === "sort") return gameSort(area);
+  if (key === "tetris") return gameTetris(area);
   if (key === "zoom") return gameZoom(area);
   if (key === "balance") return gameBalance(area);
   if (key === "cake") return gameCake(area);
@@ -4176,6 +4176,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
