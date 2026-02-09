@@ -13,7 +13,7 @@
     - Trials have an entry "Are you ready?" popup (do not auto-start)
     - No restart button on fail (they can retry by accepting entry later)
     - Random popups NEVER fire during mini-games/trials/ending
-    - Final ending triggers at affection >= 1111, also with entry popup
+    - Final ending triggers at affection >= 3000, also with entry popup
   - DEV CHEATS (NEW):
     - Press Ctrl+Shift+L anywhere (outside games) to open a cheat menu:
       • Unlimited Hearts
@@ -287,12 +287,12 @@ function openCheatMenu() {
     speak("Cheat: affection set to 1000.");
   });
 
-  addBtn("Set affection to 1111 (Ending threshold)", () => {
-    state.affection = 1111;
+  addBtn("Set affection to 3000 (Ending threshold)", () => {
+    state.affection = 3000;
     enforceCheats();
     recomputeStage();
     closePopup();
-    speak("Cheat: affection set to 1111.");
+    speak("Cheat: affection set to 3000.");
   });
 
   addBtn("Start Stage 2 Trial now", () => {
@@ -346,9 +346,9 @@ function openCheatMenu() {
 ************************/
 function desiredStageFromAffection(a) {
   let s = 1;
-  if (a >= 150) s = 2;
-  if (a >= 500) s = 3;
-  if (a >= 900) s = 4;
+  if (a >= 500) s = 2;
+  if (a >= 1000) s = 3;
+  if (a >= 2000) s = 4;
   return clampStage(s);
 }
 
@@ -380,7 +380,7 @@ function recomputeStage() {
   // If desired is ahead of unlocked, we should offer the next trial entry popup
   maybeStartTrialForStage(desired);
 
-  // Ending trigger at 1111 affection
+  // Ending trigger at 3000 affection
   maybeStartEnding();
 }
 
@@ -470,7 +470,7 @@ function promptEndingEntry() {
 
   $("modalTitle").innerText = "💫 Final Trial";
   $("modalText").innerText =
-    `Affection reached 1111.\n\n` +
+    `Affection reached 3000.\n\n` +
     `This is the ending.\n` +
     `Choices matter.\n\n` +
     `Are you ready?`;
@@ -527,7 +527,7 @@ function maybeStartEnding() {
   if (!canInterruptWithPopup()) return false;
 
   if (state.endingSeen) return false;
-  if ((state.affection || 0) < 1111) return false;
+  if ((state.affection || 0) < 3000) return false;
 
   // Only after stage 4 trial is passed (optional but feels right)
   if (!state.stageTrialPassed?.[4]) return false;
@@ -3729,6 +3729,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
