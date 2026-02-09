@@ -2551,7 +2551,7 @@ const quizData = [
 
 /***********************
 Tetris
-************************
+************************/
 
 /***********************
   Mini Game: Gift Tetris (replaces Gift Sorting Panic)
@@ -3088,6 +3088,34 @@ if (score >= 1200 || lines >= 10) {
   setMood("sad", { persist: true });
 }
   }
+  // hook buttons
+  startBtn.onclick = () => {
+    touchAction();
+    if (running) return;
+    restartBtn.style.display = "none";
+    tetris.init();
+  };
+
+  restartBtn.onclick = () => {
+    touchAction();
+    running = false;
+    tetris.unbindKeyEvents();
+    tetris.clearTimers();
+    tetris.reset();
+    restartBtn.style.display = "none";
+    tetris.init();
+  };
+
+  // quit cleanup
+  stopCurrentGame = () => {
+    disposed = true;
+    running = false;
+    tetris.unbindKeyEvents();
+    tetris.clearTimers();
+    wrap.classList.add("hidden");
+    isMiniGameRunning = false;
+  };
+} 
 
   
 /***********************
@@ -3927,6 +3955,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
