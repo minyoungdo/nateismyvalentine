@@ -1493,12 +1493,20 @@ function startGame(key) {
   const area = $("gameArea");
   area.innerHTML = "";
   stopCurrentGame = null;
+  finalizeCurrentGame = null;
 
   if (key === "catch") return gameCatch(area);
   if (key === "pop") return gamePop(area);
   if (key === "memory") return gameMemory(area);
   if (key === "react") return gameReact(area);
   if (key === "dino") return gameDino(area);
+
+  // NEW games
+  if (key === "grow") return gameGrow(area);
+  if (key === "sort") return gameSort(area);
+  if (key === "zoom") return gameZoom(area);
+  if (key === "balance") return gameBalance(area);
+  if (key === "cake") return gameCake(area);
 }
 
 /* Game 1: Catch the Hearts */
@@ -1929,13 +1937,16 @@ function gameDino(root) {
   root.innerHTML = `
     <div class="game-frame">
       <div class="row">
-        <div>Jump with <span class="kbd">Space</span> or <span class="kbd">↑</span> • tap/click canvas • 30 seconds</div>
+        <div>Jump with <span class="kbd">Space</span> or <span class="kbd">↑</span> • tap/click canvas • infinite</div>
         <div>Score: <strong id="dinoScore">0</strong></div>
       </div>
       <canvas class="canvas" id="dinoCanvas" width="720" height="360"></canvas>
       <div class="center small" style="margin-top:10px;" id="dinoMsg"></div>
     </div>
   `;
+
+  const MAX_HEARTS = 60;
+  const MAX_AFFECTION = 28;
 
   const canvas = $("dinoCanvas");
   const ctx = canvas.getContext("2d");
@@ -1962,7 +1973,6 @@ function gameDino(root) {
 
   let running = true;
   let last = performance.now();
-  let tLeft = 30000;
 
   let score = 0;
   let speed = 220;
@@ -1990,7 +2000,6 @@ function gameDino(root) {
   }
 
   const obs = [];
-
   function obstacleSetForStage(stage) {
     if (stage === 1) return ["💘", "🐶", "🧸"];
     if (stage === 2) return ["🐕", "💘", "💞"];
@@ -1998,6 +2007,27 @@ function gameDino(root) {
     return ["🍕", "💘", "🐶"];
   }
   const obstacleEmojis = obstacleSetForStage(clampStage(state.stage));
+
+  let finalized = false;
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const heartsEarned = clamp(Math.round(score / 12) + 10, 10, MAX_HEARTS);
+    const affectionEarned = clamp(Math.round(score / 25) + 6, 6, MAX_AFFECTION);
+    addRewards(heartsEarned, affectionEarned);
+
+    $("dinoMsg").innerText = `Quit: +${heartsEarned} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “Okay wait… I’m kind of athletic?”");
+
+    if (score >= 240) setMood("happy", { persist: true });
+
+    if (state.buffGoofyNate > 0 && Math.random() < 0.45) {
+      speak("Minyoung: “I’m smiling. Don’t talk.”");
+    }
+
+    maybePopup("afterGame");
+  };
 
   function jump() {
     if (!running) return;
@@ -2012,7 +2042,6 @@ function gameDino(root) {
   function spawnObstacle() {
     const isTall = Math.random() < 0.35;
     const emoji = obstacleEmojis[Math.floor(Math.random() * obstacleEmojis.length)];
-
     obs.push({
       x: canvas.width + 20,
       y: groundY + (isTall ? -16 : 2),
@@ -2090,42 +2119,10 @@ function gameDino(root) {
     });
   }
 
-  function end(winLike = true) {
-    running = false;
-    isMiniGameRunning = false;
-    cleanup();
-
-    const heartsEarned = clamp(Math.round(score / 12) + 10, 10, 60);
-    const affectionEarned = clamp(Math.round(score / 25) + 6, 6, 28);
-    addRewards(heartsEarned, affectionEarned);
-
-    $("dinoMsg").innerText = `Result: +${heartsEarned} hearts 💗`;
-
-    if (winLike) {
-      speak("Minyoung: “Okay wait… I’m kind of athletic?”");
-      if (score >= 240) setMood("happy", { persist: true });
-    } else {
-      speak("Minyoung: “I tripped… but I did it cutely.”");
-      if (Math.random() < 0.45) setMood("sad", { persist: true });
-    }
-
-    if (state.buffGoofyNate > 0 && Math.random() < 0.45) {
-      speak("Minyoung: “I’m smiling. Don’t talk.”");
-    }
-
-    maybePopup("afterGame");
-  }
-
   function loop(now) {
     if (!running) return;
     const dt = (now - last) / 1000;
     last = now;
-
-    tLeft -= dt * 1000;
-    if (tLeft <= 0) {
-      end(true);
-      return;
-    }
 
     speed += dt * 7;
 
@@ -2162,10 +2159,17 @@ function gameDino(root) {
     for (const o of obs) {
       const oHitbox = { x: o.x, y: o.y + 8, w: o.w + 10, h: o.h - 10 };
       if (rectsOverlap(pHitbox, oHitbox)) {
-        end(false);
-        return;
+        // instead of ending the game, just “bonk” and reset score a bit
+        score = Math.max(0, score - 60);
+        if (Math.random() < 0.45) setMood("sad", { persist: true });
       }
     }
+
+    const projected = clamp(Math.round(score / 12) + 10, 10, MAX_HEARTS);
+    $("dinoMsg").innerText =
+      projected >= MAX_HEARTS
+        ? `Max rewards reached (${MAX_HEARTS}). Keep running 😌`
+        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
 
     drawBackground();
     drawTrail(dt);
@@ -2196,10 +2200,447 @@ function gameDino(root) {
   stopCurrentGame = () => {
     running = false;
     isMiniGameRunning = false;
+    finalizeCurrentGame = null;
     cleanup();
   };
 
   requestAnimationFrame(loop);
+}
+
+
+/* Game 6: Grow the Love Plants */
+function gameGrow(root) {
+  $("gameTitle").innerText = "🌱 Grow the Love Plants";
+
+  const MAX_HEARTS = 45;
+  const MAX_AFFECTION = 25;
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <div class="row">
+        <div>Tap FAST • play forever</div>
+        <div>Growth: <strong id="growScore">0</strong>%</div>
+      </div>
+
+      <div style="height:200px; display:flex; align-items:flex-end; justify-content:center;">
+        <div id="plant" style="
+          width:60px;
+          height:20px;
+          border-radius:20px;
+          background:linear-gradient(#ff7ab6,#ff4d88);
+          transition:height .05s;
+        "></div>
+      </div>
+
+      <div class="center">
+        <button id="growBtn" class="btn">WATER 🌊</button>
+      </div>
+
+      <div class="center small" id="growMsg"></div>
+    </div>
+  `;
+
+  let growth = 0;
+  let running = true;
+  let finalized = false;
+
+  const plant = $("plant");
+  const msg = $("growMsg");
+
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const hearts = clamp(Math.floor(growth / 2), 8, MAX_HEARTS);
+    const affection = clamp(Math.floor(growth / 4), 2, MAX_AFFECTION);
+    addRewards(hearts, affection);
+
+    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “Stop… why is that so cute.”");
+
+    if (growth > 60) setMood("happy");
+    maybePopup("afterGame");
+  };
+
+  $("growBtn").onclick = () => {
+    if (!running) return;
+    touchAction();
+
+    growth += 2 + Math.random() * 2;
+    plant.style.height = `${20 + growth * 2}px`;
+    $("growScore").innerText = Math.floor(growth);
+
+    const projected = clamp(Math.floor(growth / 2), 8, MAX_HEARTS);
+    msg.innerText =
+      projected >= MAX_HEARTS
+        ? `Max rewards reached (${MAX_HEARTS}). Keep watering 😌`
+        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+  };
+
+  stopCurrentGame = () => {
+    running = false;
+    isMiniGameRunning = false;
+    finalizeCurrentGame = null;
+  };
+}
+
+function gameSort(root) {
+  $("gameTitle").innerText = "🎁 Gift Sorting Panic";
+
+  const MAX_HEARTS = 50;
+  const MAX_AFFECTION = 30;
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <div class="row">
+        <div>Click good gifts. Avoid cursed ones.</div>
+        <div>Score: <strong id="sortScore">0</strong></div>
+      </div>
+
+      <div id="sortField" style="
+        position:relative;
+        height:340px;
+        border-radius:16px;
+        background:rgba(255,255,255,.7);
+        overflow:hidden;"></div>
+
+      <div class="center small" id="sortMsg" style="margin-top:10px;"></div>
+    </div>
+  `;
+
+  const good = ["💗","🎀","🍓","🧸","☕"];
+  const bad = ["🧅","💀","📉","🗑️"];
+
+  let score = 0;
+  let running = true;
+  let finalized = false;
+
+  const field = $("sortField");
+  const msg = $("sortMsg");
+
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const hearts = clamp(score, 6, MAX_HEARTS);
+    const affection = clamp(Math.floor(Math.max(0, score) / 3), 2, MAX_AFFECTION);
+    addRewards(hearts, affection);
+
+    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “You panic-gifted perfectly.”");
+    maybePopup("afterGame");
+  };
+
+  function spawn() {
+    if (!running) return;
+
+    const el = document.createElement("div");
+    const isBad = Math.random() < 0.35;
+
+    el.innerText = isBad
+      ? bad[Math.floor(Math.random() * bad.length)]
+      : good[Math.floor(Math.random() * good.length)];
+
+    el.style.position = "absolute";
+    el.style.left = `${Math.random() * 90}%`;
+    el.style.top = "-30px";
+    el.style.fontSize = "28px";
+    el.style.cursor = "pointer";
+
+    el.onclick = () => {
+      if (!running) return;
+      touchAction();
+
+      if (isBad) {
+        score -= 4;
+        setMood("sad");
+      } else {
+        score += 6;
+      }
+
+      $("sortScore").innerText = score;
+      el.remove();
+
+      const projected = clamp(score, 6, MAX_HEARTS);
+      msg.innerText =
+        projected >= MAX_HEARTS
+          ? `Max rewards reached (${MAX_HEARTS}). Keep sorting 😌`
+          : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+    };
+
+    field.appendChild(el);
+
+    let y = -30;
+    const fall = setInterval(() => {
+      y += 4;
+      el.style.top = `${y}px`;
+      if (y > 360) {
+        clearInterval(fall);
+        el.remove();
+      }
+    }, 16);
+  }
+
+  const spawner = setInterval(spawn, 450);
+
+  stopCurrentGame = () => {
+    running = false;
+    isMiniGameRunning = false;
+    finalizeCurrentGame = null;
+    clearInterval(spawner);
+  };
+}
+
+function gameZoom(root) {
+  $("gameTitle").innerText = "🐶 Fudge Zoomies";
+
+  const MAX_HEARTS = 60;
+  const MAX_AFFECTION = 28;
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <canvas id="zoomCanvas" width="720" height="320" class="canvas"></canvas>
+      <div class="center small">Move ← → • survive forever</div>
+      <div class="center small" id="zoomMsg" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  const c = $("zoomCanvas");
+  const ctx = c.getContext("2d");
+  const msg = $("zoomMsg");
+
+  let playerX = 360;
+  let score = 0;
+  let running = true;
+  let finalized = false;
+
+  const dogs = [];
+
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const hearts = clamp(Math.floor(score / 18), 10, MAX_HEARTS);
+    const affection = clamp(Math.floor(score / 55), 6, MAX_AFFECTION);
+    addRewards(hearts, affection);
+
+    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “That dog has zero brakes.”");
+    maybePopup("afterGame");
+  };
+
+  function spawn() {
+    dogs.push({
+      x: -40,
+      y: 40 + Math.random() * 240,
+      speed: 4 + Math.random() * 3
+    });
+  }
+
+  const spawner = setInterval(spawn, 900);
+
+  function loop() {
+    if (!running) return;
+
+    ctx.clearRect(0, 0, c.width, c.height);
+
+    ctx.font = "22px ui-monospace, system-ui";
+    ctx.fillText("💗", playerX, 280);
+
+    dogs.forEach(d => {
+      d.x += d.speed;
+      ctx.fillText("🐶", d.x, d.y);
+
+      // bonk = score penalty instead of ending
+      if (Math.abs(d.x - playerX) < 18 && Math.abs(d.y - 280) < 18) {
+        score = Math.max(0, score - 80);
+        if (Math.random() < 0.35) setMood("sad", { persist: true });
+      }
+    });
+
+    // cleanup offscreen dogs
+    for (let i = dogs.length - 1; i >= 0; i--) {
+      if (dogs[i].x > 800) dogs.splice(i, 1);
+    }
+
+    score++;
+    const projected = clamp(Math.floor(score / 18), 10, MAX_HEARTS);
+    msg.innerText =
+      projected >= MAX_HEARTS
+        ? `Max rewards reached (${MAX_HEARTS}). Keep dodging 😌`
+        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+
+    requestAnimationFrame(loop);
+  }
+
+  function onKey(e) {
+    if (e.key === "ArrowLeft") playerX = Math.max(20, playerX - 25);
+    if (e.key === "ArrowRight") playerX = Math.min(700, playerX + 25);
+  }
+  window.addEventListener("keydown", onKey);
+
+  stopCurrentGame = () => {
+    running = false;
+    isMiniGameRunning = false;
+    finalizeCurrentGame = null;
+    clearInterval(spawner);
+    window.removeEventListener("keydown", onKey);
+  };
+
+  loop();
+}
+
+function gameBalance(root) {
+  $("gameTitle").innerText = "💌 Balance the Love Meter";
+
+  const MAX_HEARTS = 40;
+  const MAX_AFFECTION = 24;
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <div style="height:20px;background:#eee;border-radius:10px;position:relative;">
+        <div id="needle" style="position:absolute;width:8px;height:24px;background:#ff4d88;"></div>
+        <div style="position:absolute;left:47%;top:0;bottom:0;width:6%;background:rgba(255,77,136,.25);"></div>
+      </div>
+      <div class="center small" style="margin-top:10px;">Tap ← → to keep it centered • infinite</div>
+      <div class="center small" id="balMsg" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  let pos = 50;
+  let streak = 0;
+  let running = true;
+  let finalized = false;
+
+  const needle = $("needle");
+  const msg = $("balMsg");
+
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const hearts = clamp(Math.floor(streak / 18) + 12, 12, MAX_HEARTS);
+    const affection = clamp(Math.floor(streak / 40) + 6, 6, MAX_AFFECTION);
+    addRewards(hearts, affection);
+
+    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “Relationships are about balance…”");
+    maybePopup("afterGame");
+  };
+
+  function drift() {
+    pos += Math.random() * 6 - 3;
+    pos = clamp(pos, 0, 100);
+    needle.style.left = `${pos}%`;
+
+    const inCenter = pos >= 47 && pos <= 53;
+    if (inCenter) streak++;
+    else streak = Math.max(0, streak - 2);
+
+    const projected = clamp(Math.floor(streak / 18) + 12, 12, MAX_HEARTS);
+    msg.innerText =
+      projected >= MAX_HEARTS
+        ? `Max rewards reached (${MAX_HEARTS}). Keep balancing 😌`
+        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+  }
+
+  const driftInt = setInterval(drift, 120);
+
+  function onKey(e) {
+    if (e.key === "ArrowLeft") pos -= 6;
+    if (e.key === "ArrowRight") pos += 6;
+  }
+  window.addEventListener("keydown", onKey);
+
+  stopCurrentGame = () => {
+    running = false;
+    isMiniGameRunning = false;
+    finalizeCurrentGame = null;
+    clearInterval(driftInt);
+    window.removeEventListener("keydown", onKey);
+  };
+}
+
+function gameCake(root) {
+  $("gameTitle").innerText = "🍰 Cake Stack Chaos";
+
+  const MAX_HEARTS = 50;
+  const MAX_AFFECTION = 25;
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <canvas id="cakeCanvas" width="720" height="320" class="canvas"></canvas>
+      <div class="center small">Press SPACE to drop layers • infinite</div>
+      <div class="center small" id="cakeMsg" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  const c = $("cakeCanvas");
+  const ctx = c.getContext("2d");
+  const msg = $("cakeMsg");
+
+  let layers = [];
+  let x = 0;
+  let dir = 4;
+  let running = true;
+  let finalized = false;
+
+  finalizeCurrentGame = () => {
+    if (finalized) return;
+    finalized = true;
+
+    const stack = layers.length;
+    const hearts = clamp(10 + stack * 6, 10, MAX_HEARTS);
+    const affection = clamp(6 + stack * 2, 6, MAX_AFFECTION);
+    addRewards(hearts, affection);
+
+    msg.innerText = `Quit: +${hearts} hearts 💗 (max ${MAX_HEARTS})`;
+    speak("Minyoung: “That cake is dangerously tall…”");
+    maybePopup("afterGame");
+  };
+
+  function loop() {
+    if (!running) return;
+
+    ctx.clearRect(0, 0, 720, 320);
+    ctx.font = "26px ui-monospace, system-ui";
+
+    x += dir;
+    if (x < 0 || x > 660) dir *= -1;
+
+    ctx.fillText("🎂", x, 60);
+
+    layers.forEach((l, i) => {
+      ctx.fillText("🍰", l.x, 260 - i * 28);
+    });
+
+    const projected = clamp(10 + layers.length * 6, 10, MAX_HEARTS);
+    msg.innerText =
+      projected >= MAX_HEARTS
+        ? `Max rewards reached (${MAX_HEARTS}). Keep stacking 😌`
+        : `Quit anytime to claim rewards (up to ${MAX_HEARTS} hearts).`;
+
+    requestAnimationFrame(loop);
+  }
+
+  function onKey(e) {
+    if (e.code === "Space") {
+      e.preventDefault();
+      touchAction();
+      layers.push({ x });
+      if (layers.length % 5 === 0) setMood("happy", { persist: true });
+    }
+  }
+  window.addEventListener("keydown", onKey);
+
+  stopCurrentGame = () => {
+    running = false;
+    isMiniGameRunning = false;
+    finalizeCurrentGame = null;
+    window.removeEventListener("keydown", onKey);
+  };
+
+  loop();
 }
 
 /***********************
@@ -3288,6 +3729,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
