@@ -1502,7 +1502,7 @@ function startGame(key) {
   if (key === "dino") return gameDino(area);
 
   // NEW games
-  if (key === "grow") return gameGrow(area);
+  if (key === "quiz") return gameQuiz(area);
   if (key === "sort") return gameSort(area);
   if (key === "zoom") return gameZoom(area);
   if (key === "balance") return gameBalance(area);
@@ -3729,6 +3729,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
