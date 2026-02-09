@@ -2214,103 +2214,124 @@ function gameQuiz(root) {
   $("gameTitle").innerText = "🧠 Minyoung Quiz";
 
   // You can edit/replace these questions anytime
-  const quizData = [
-    {
-      question: "What is the capital of France?",
-      options: ["Paris", "London", "Berlin", "Madrid"],
-      answer: "Paris",
-    },
-    {
-      question: "What is the largest planet in our solar system?",
-      options: ["Mars", "Saturn", "Jupiter", "Neptune"],
-      answer: "Jupiter",
-    },
-    {
-      question: "Which country won the FIFA World Cup in 2018?",
-      options: ["Brazil", "Germany", "France", "Argentina"],
-      answer: "France",
-    },
-    {
-      question: "What is the tallest mountain in the world?",
-      options: ["Mount Everest", "K2", "Kangchenjunga", "Makalu"],
-      answer: "Mount Everest",
-    },
-    {
-      question: "Which is the largest ocean on Earth?",
-      options: ["Pacific Ocean", "Indian Ocean", "Atlantic Ocean", "Arctic Ocean"],
-      answer: "Pacific Ocean",
-    },
-    {
-      question: "What is the chemical symbol for gold?",
-      options: ["Au", "Ag", "Cu", "Fe"],
-      answer: "Au",
-    },
-    {
-      question: "Who painted the Mona Lisa?",
-      options: ["Pablo Picasso", "Vincent van Gogh", "Leonardo da Vinci", "Michelangelo"],
-      answer: "Leonardo da Vinci",
-    },
-    {
-      question: "Which planet is known as the Red Planet?",
-      options: ["Mars", "Venus", "Mercury", "Uranus"],
-      answer: "Mars",
-    },
-    {
-      question: "What is the largest species of shark?",
-      options: ["Great White Shark", "Whale Shark", "Tiger Shark", "Hammerhead Shark"],
-      answer: "Whale Shark",
-    },
-    {
-      question: "Which animal is known as the King of the Jungle?",
-      options: ["Lion", "Tiger", "Elephant", "Giraffe"],
-      answer: "Lion",
-    },
-    {
-      question: "What is the capital of Japan?",
-      options: ["Tokyo", "Kyoto", "Osaka", "Nagoya"],
-      answer: "Tokyo",
-    },
-    {
-      question: "Which element has the atomic number 1?",
-      options: ["Helium", "Oxygen", "Hydrogen", "Carbon"],
-      answer: "Hydrogen",
-    },
-    {
-      question: "Who wrote 'Romeo and Juliet'?",
-      options: ["Charles Dickens", "William Shakespeare", "Mark Twain", "Leo Tolstoy"],
-      answer: "William Shakespeare",
-    },
-    {
-      question: "What is the smallest country in the world?",
-      options: ["Monaco", "San Marino", "Liechtenstein", "Vatican City"],
-      answer: "Vatican City",
-    },
-    {
-      question: "Which planet is known for its rings?",
-      options: ["Venus", "Saturn", "Jupiter", "Neptune"],
-      answer: "Saturn",
-    },
-    {
-      question: "Who discovered penicillin?",
-      options: ["Marie Curie", "Alexander Fleming", "Louis Pasteur", "Isaac Newton"],
-      answer: "Alexander Fleming",
-    },
-    {
-      question: "Which continent is the Sahara Desert located on?",
-      options: ["Asia", "Africa", "Australia", "Europe"],
-      answer: "Africa",
-    },
-    {
-      question: "What is the main ingredient in guacamole?",
-      options: ["Tomato", "Avocado", "Onion", "Pepper"],
-      answer: "Avocado",
-    },
-    {
-      question: "Which country is known as the Land of the Rising Sun?",
-      options: ["China", "South Korea", "Thailand", "Japan"],
-      answer: "Japan",
-    },
-  ];
+const quizData = [
+  {
+    question: "What’s my favorite movie genre?",
+    options: [
+      "Psychological thriller",
+      "Apocalypse / disaster movies",
+      "True crime documentaries",
+      "Comedy"
+    ],
+    answer: "Apocalypse / disaster movies",
+  },
+  {
+    question: "What is my height in cm?",
+    options: ["157", "158", "159", "161"],
+    answer: "158",
+  },
+  {
+    question: "What are the names of my cats?",
+    options: [
+      "Hibon & Sebon",
+      "Heebon & Saebon",
+      "Hibon & Sebon",
+      "Haebon & Saebon"
+    ],
+    answer: "Heebon & Saebon",
+  },
+  {
+    question: "In what year did I graduate high school?",
+    options: ["2010", "2011", "2012", "2013"],
+    answer: "2012",
+  },
+  {
+    question: "What is my title at work?",
+    options: [
+      "Director of Data Analytics",
+      "Director of Data and Evaluation",
+      "Head of Data and Insights",
+      "Director of Data and Research"
+    ],
+    answer: "Director of Data and Evaluation",
+  },
+  {
+    question: "Where have we NOT been on Valentine’s Day?",
+    options: ["Washington DC", "Honolulu", "Singapore", "Venice"],
+    answer: "Venice",
+  },
+  {
+    question: "What was the name of the Valentine’s retreat we took in 2019?",
+    options: ["Lake Geneva", "Clam Lake", "Cedar Lake", "Clam County"],
+    answer: "Clam Lake",
+  },
+  {
+    question: "What was the first Valentine’s Day gift I gave you?",
+    options: [
+      "Chocolate chip cookies",
+      "Dried fruit chocolate bark",
+      "Chocolate-covered strawberries",
+      "Chocolate from Paris"
+    ],
+    answer: "Dried fruit chocolate bark",
+  },
+  {
+    question: "As of 2026, what is Fudge’s vitamin brand?",
+    options: ["Zesty Paws", "Dog is Human", "Native Pet", "Pet Honesty"],
+    answer: "Dog is Human",
+  },
+  {
+    question: "What color was the first winter jacket I bought Drake in 2017?",
+    options: ["Navy", "Grey", "Forest green", "Burgundy"],
+    answer: "Grey",
+  },
+  {
+    question: "What was my favorite flavor at Pumphouse Creamery in Minneapolis?",
+    options: ["Cookies & Cream", "Cherry", "Seven Layers Bar", "Strawberry basil"],
+    answer: "Cherry",
+  },
+  {
+    question: "What is the name of the dog bath place Drake and I used to go to?",
+    options: ["Bubble Paws", "Bubbly Paws", "Bubbly Wash", "Bubbly Dogs"],
+    answer: "Bubbly Paws",
+  },
+  {
+    question: "One day, Drake rolled in ______, and I screamed and rushed him to the bath place.",
+    options: ["Goose poop", "Dead squirrel", "Mystery swamp mud", "Rotting leaves"],
+    answer: "Dead squirrel",
+  },
+  {
+    question: "What is the name of the cigarettes I used to smoke?",
+    options: ["Esse Lights", "Esse Change 1", "Marlboro Ice", "Parliament Aqua"],
+    answer: "Esse Change 1",
+  },
+  {
+    question: "I tried bell peppers for the first time in Granada after eating a bell pepper stuffed with…",
+    options: ["Chicken Thigh", "Ox tail", "Chorizo", "Seafood"],
+    answer: "Ox tail",
+  },
+  {
+    question: "What dish did I eat the MOST repeatedly in Korea last year?",
+    options: ["Dakgalbi", "Kimchi jjigae", "Galbi", "Pizza"],
+    answer: "Galbi",
+  },
+  {
+    question: "How many days did I stay in Korea in 2025?",
+    options: ["47", "52", "54", "62"],
+    answer: "54",
+  },
+  {
+    question: "Which weird thing did you not say to me?",
+    options: [
+      "“I prefer being a mega mandu.”",
+      "“I am your bacterial brother.”",
+      "“Rub your foot fungus on me.”",
+      "“Pop that oxytocin.”"
+    ],
+    answer: "“Rub your foot fungus on me.”",
+  },
+];
+
 
   root.innerHTML = `
     <div class="game-frame">
@@ -2460,14 +2481,14 @@ function gameQuiz(root) {
       `You scored <strong>${score}</strong> out of <strong>${total}</strong>.<br>` +
       `Result: +${heartsEarned} hearts 💗`;
 
-    if (pct >= 0.75) {
+    if (pct >= 0.80) {
       setMood("happy", { persist: true });
-      speak("Minyoung: “Okay brainy… that was hot.” 😳💗");
-    } else if (pct <= 0.3 && Math.random() < 0.35) {
+      speak("Minyoung: “Okay... you definitely know me. I love you!” 😳💗");
+    } else if (pct <= 0.6 && Math.random() < 0.80) {
       setMood("sad", { persist: true });
-      speak("Minyoung: “It’s okay… I still like you.” 🥺");
+      speak("Minyoung: “Well... I still like you... I guess.” 🥺");
     } else {
-      speak("Minyoung: “Not bad. Do it again.”");
+      speak("Minyoung: “I hate you!!”");
     }
 
     maybePopup("afterGame");
@@ -3617,6 +3638,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
