@@ -2206,130 +2206,66 @@ function gameDino(root) {
 }
 
 
-/* Game X: Minyoung Quiz (no timer, capped rewards) */
+/* -------------------------------------------------------
+  Helpers (only if you don't already have these globally)
+-------------------------------------------------------- */
+function $(id) { return document.getElementById(id); }
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+/* -------------------------------------------------------
+  Game X: Minyoung Quiz (no timer, capped rewards)
+-------------------------------------------------------- */
 function gameQuiz(root) {
   touchAction();
   $("gameTitle").innerText = "🧠 Minyoung Quiz";
 
-  // You can edit/replace these questions anytime
-const quizData = [
-  {
-    question: "What’s my favorite movie genre?",
-    options: [
-      "Psychological thriller",
-      "Apocalypse / disaster movies",
-      "True crime documentaries",
-      "Comedy"
-    ],
-    answer: "Apocalypse / disaster movies",
-  },
-  {
-    question: "What is my height in cm?",
-    options: ["157", "158", "159", "161"],
-    answer: "158",
-  },
-  {
-    question: "What are the names of my cats?",
-    options: [
-      "Hibon & Sebon",
-      "Heebon & Saebon",
-      "Hibon & Sebon",
-      "Haebon & Saebon"
-    ],
-    answer: "Heebon & Saebon",
-  },
-  {
-    question: "In what year did I graduate high school?",
-    options: ["2010", "2011", "2012", "2013"],
-    answer: "2012",
-  },
-  {
-    question: "What is my title at work?",
-    options: [
-      "Director of Data Analytics",
-      "Director of Data and Evaluation",
-      "Head of Data and Insights",
-      "Director of Data and Research"
-    ],
-    answer: "Director of Data and Evaluation",
-  },
-  {
-    question: "Where have we NOT been on Valentine’s Day?",
-    options: ["Washington DC", "Honolulu", "Singapore", "Venice"],
-    answer: "Venice",
-  },
-  {
-    question: "What was the name of the Valentine’s retreat we took in 2019?",
-    options: ["Lake Geneva", "Clam Lake", "Cedar Lake", "Clam County"],
-    answer: "Clam Lake",
-  },
-  {
-    question: "What was the first Valentine’s Day gift I gave you?",
-    options: [
-      "Chocolate chip cookies",
-      "Dried fruit chocolate bark",
-      "Chocolate-covered strawberries",
-      "Chocolate from Paris"
-    ],
-    answer: "Dried fruit chocolate bark",
-  },
-  {
-    question: "As of 2026, what is Fudge’s vitamin brand?",
-    options: ["Zesty Paws", "Dog is Human", "Native Pet", "Pet Honesty"],
-    answer: "Dog is Human",
-  },
-  {
-    question: "What color was the first winter jacket I bought Drake in 2017?",
-    options: ["Navy", "Grey", "Forest green", "Burgundy"],
-    answer: "Grey",
-  },
-  {
-    question: "What was my favorite flavor at Pumphouse Creamery in Minneapolis?",
-    options: ["Cookies & Cream", "Cherry", "Seven Layers Bar", "Strawberry basil"],
-    answer: "Cherry",
-  },
-  {
-    question: "What is the name of the dog bath place Drake and I used to go to?",
-    options: ["Bubble Paws", "Bubbly Paws", "Bubbly Wash", "Bubbly Dogs"],
-    answer: "Bubbly Paws",
-  },
-  {
-    question: "One day, Drake rolled in ______, and I screamed and rushed him to the bath place.",
-    options: ["Goose poop", "Dead squirrel", "Mystery swamp mud", "Rotting leaves"],
-    answer: "Dead squirrel",
-  },
-  {
-    question: "What is the name of the cigarettes I used to smoke?",
-    options: ["Esse Lights", "Esse Change 1", "Marlboro Ice", "Parliament Aqua"],
-    answer: "Esse Change 1",
-  },
-  {
-    question: "I tried bell peppers for the first time in Granada after eating a bell pepper stuffed with…",
-    options: ["Chicken Thigh", "Ox tail", "Chorizo", "Seafood"],
-    answer: "Ox tail",
-  },
-  {
-    question: "What dish did I eat the MOST repeatedly in Korea last year?",
-    options: ["Dakgalbi", "Kimchi jjigae", "Galbi", "Pizza"],
-    answer: "Galbi",
-  },
-  {
-    question: "How many days did I stay in Korea in 2025?",
-    options: ["47", "52", "54", "62"],
-    answer: "54",
-  },
-  {
-    question: "Which weird thing did you not say to me?",
-    options: [
-      "“I prefer being a mega mandu.”",
-      "“I am your bacterial brother.”",
-      "“Rub your foot fungus on me.”",
-      "“Pop that oxytocin.”"
-    ],
-    answer: "“Rub your foot fungus on me.”",
-  },
-];
-
+  const quizData = [
+    {
+      question: "What’s my favorite movie genre?",
+      options: ["Psychological thriller", "Apocalypse / disaster movies", "True crime documentaries", "Comedy"],
+      answer: "Apocalypse / disaster movies",
+    },
+    { question: "What is my height in cm?", options: ["157", "158", "159", "161"], answer: "158" },
+    {
+      question: "What are the names of my cats?",
+      options: ["Hibon & Sebon", "Heebon & Saebon", "Hibon & Sebon", "Haebon & Saebon"],
+      answer: "Heebon & Saebon",
+    },
+    { question: "In what year did I graduate high school?", options: ["2010", "2011", "2012", "2013"], answer: "2012" },
+    {
+      question: "What is my title at work?",
+      options: ["Director of Data Analytics", "Director of Data and Evaluation", "Head of Data and Insights", "Director of Data and Research"],
+      answer: "Director of Data and Evaluation",
+    },
+    { question: "Where have we NOT been on Valentine’s Day?", options: ["Washington DC", "Honolulu", "Singapore", "Venice"], answer: "Venice" },
+    { question: "What was the name of the Valentine’s retreat we took in 2019?", options: ["Lake Geneva", "Clam Lake", "Cedar Lake", "Clam County"], answer: "Clam Lake" },
+    {
+      question: "What was the first Valentine’s Day gift I gave you?",
+      options: ["Chocolate chip cookies", "Dried fruit chocolate bark", "Chocolate-covered strawberries", "Chocolate from Paris"],
+      answer: "Dried fruit chocolate bark",
+    },
+    { question: "As of 2026, what is Fudge’s vitamin brand?", options: ["Zesty Paws", "Dog is Human", "Native Pet", "Pet Honesty"], answer: "Dog is Human" },
+    { question: "What color was the first winter jacket I bought Drake in 2017?", options: ["Navy", "Grey", "Forest green", "Burgundy"], answer: "Grey" },
+    { question: "What was my favorite flavor at Pumphouse Creamery in Minneapolis?", options: ["Cookies & Cream", "Cherry", "Seven Layers Bar", "Strawberry basil"], answer: "Cherry" },
+    { question: "What is the name of the dog bath place Drake and I used to go to?", options: ["Bubble Paws", "Bubbly Paws", "Bubbly Wash", "Bubbly Dogs"], answer: "Bubbly Paws" },
+    {
+      question: "One day, Drake rolled in ______, and I screamed and rushed him to the bath place.",
+      options: ["Goose poop", "Dead squirrel", "Mystery swamp mud", "Rotting leaves"],
+      answer: "Dead squirrel",
+    },
+    { question: "What is the name of the cigarettes I used to smoke?", options: ["Esse Lights", "Esse Change 1", "Marlboro Ice", "Parliament Aqua"], answer: "Esse Change 1" },
+    { question: "I tried bell peppers for the first time in Granada after eating a bell pepper stuffed with…", options: ["Chicken Thigh", "Ox tail", "Chorizo", "Seafood"], answer: "Ox tail" },
+    { question: "What dish did I eat the MOST repeatedly in Korea last year?", options: ["Dakgalbi", "Kimchi jjigae", "Galbi", "Pizza"], answer: "Galbi" },
+    { question: "How many days did I stay in Korea in 2025?", options: ["47", "52", "54", "62"], answer: "54" },
+    {
+      question: "Which weird thing did you not say to me?",
+      options: ["“I prefer being a mega mandu.”", "“I am your bacterial brother.”", "“Rub your foot fungus on me.”", "“Pop that oxytocin.”"],
+      answer: "“Rub your foot fungus on me.”",
+    },
+  ];
 
   root.innerHTML = `
     <div class="game-frame">
@@ -2402,10 +2338,8 @@ const quizData = [
       radio.name = "quiz";
       radio.value = shuffledOptions[i];
 
-      const optionText = document.createTextNode(shuffledOptions[i]);
-
       option.appendChild(radio);
-      option.appendChild(optionText);
+      option.appendChild(document.createTextNode(shuffledOptions[i]));
       optionsElement.appendChild(option);
     }
 
@@ -2450,8 +2384,6 @@ const quizData = [
 
   function displayResult() {
     finished = true;
-
-    // IMPORTANT: end mini game state
     isMiniGameRunning = false;
 
     quizContainer.style.display = "none";
@@ -2462,34 +2394,33 @@ const quizData = [
     const total = quizData.length;
     const pct = total ? score / total : 0;
 
-    // Rewards (capped)
-    // You can tune these numbers:
-    const heartsEarnedRaw = Math.round(score * 6);       // 0..114
-    const affectionEarnedRaw = Math.round(score * 2.2);  // 0..42
+    const heartsEarnedRaw = Math.round(score * 6);
+    const affectionEarnedRaw = Math.round(score * 2.2);
 
-    const MAX_HEARTS = 60;      // <- max hearts for this game
-    const MAX_AFFECTION = 28;   // <- max affection for this game
+    const MAX_HEARTS = 60;
+    const MAX_AFFECTION = 28;
 
     const heartsEarned = clamp(heartsEarnedRaw, 5, MAX_HEARTS);
     const affectionEarned = clamp(affectionEarnedRaw, 2, MAX_AFFECTION);
 
-    addRewards(heartsEarned, affectionEarned);
+    addRewards?.(heartsEarned, affectionEarned);
 
     resultContainer.innerHTML =
       `You scored <strong>${score}</strong> out of <strong>${total}</strong>.<br>` +
       `Result: +${heartsEarned} hearts 💗`;
 
-    if (pct >= 0.80) {
-      setMood("happy", { persist: true });
-      speak("Minyoung: “Okay... you definitely know me. I love you!” 😳💗");
-    } else if (pct <= 0.6 && Math.random() < 0.80) {
-      setMood("sad", { persist: true });
-      speak("Minyoung: “Well... I still like you... I guess.” 🥺");
+    if (pct >= 0.8) {
+      setMood?.("happy", { persist: true });
+      speak?.("Minyoung: “Okay... you definitely know me. I love you!” 😳💗");
+    } else if (pct <= 0.6 && Math.random() < 0.8) {
+      setMood?.("sad", { persist: true });
+      speak?.("Minyoung: “Well... I still like you... I guess.” 🥺");
     } else {
-      speak("Minyoung: “I hate you!!”");
+      // (you said you dislike the phrase "I hate" generally, so I'm not using it here)
+      speak?.("Minyoung: “Hmm… close, but not quite 😤”");
     }
 
-    maybePopup("afterGame");
+    maybePopup?.("afterGame");
   }
 
   function retryQuiz() {
@@ -2505,9 +2436,7 @@ const quizData = [
     showAnswerButton.style.display = "none";
     resultContainer.innerHTML = "";
 
-    // Since we restarted, lock mini game again
     isMiniGameRunning = true;
-
     displayQuestion();
   }
 
@@ -2549,24 +2478,21 @@ const quizData = [
   displayQuestion();
 }
 
-/***********************
+/* -------------------------------------------------------
   Mini Game: Stack Yo Block (Tetris)
-************************/
+  IMPORTANT: This assumes a #tetrisWrap exists in HTML
+-------------------------------------------------------- */
 function gameTetris(root) {
-
   touchAction();
   $("gameTitle").innerText = "🎁 Stack Yo Block";
 
   root.innerHTML = "";
-
   const wrap = document.getElementById("tetrisWrap");
-
   if (!wrap) {
     root.innerHTML = `<div class="game-frame">Missing #tetrisWrap HTML.</div>`;
     isMiniGameRunning = false;
     return;
   }
-
   wrap.classList.remove("hidden");
   root.appendChild(wrap);
 
@@ -2577,6 +2503,14 @@ function gameTetris(root) {
   const levelEl = document.getElementById("tLevel");
   const linesEl = document.getElementById("tLines");
 
+  if (!canvas || !startBtn || !restartBtn || !scoreEl || !levelEl || !linesEl) {
+    root.innerHTML = `<div class="game-frame">Tetris HTML is incomplete (missing tCanvas/tStartBtn/tRestartBtn/tScore/tLevel/tLines).</div>`;
+    isMiniGameRunning = false;
+    wrap.classList.add("hidden");
+    return;
+  }
+
+  // reset
   canvas.innerHTML = "";
   restartBtn.style.display = "none";
 
@@ -2587,130 +2521,132 @@ function gameTetris(root) {
   const ROWS = 20;
   const SIZE = 22;
 
+  // make sure the canvas size matches logic (CSS also sets these)
+  canvas.style.position = "relative";
+  canvas.style.width = (COLS * SIZE) + "px";
+  canvas.style.height = (ROWS * SIZE) + "px";
+
   const board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
 
   const shapes = [
-    [[1,1,1,1]],
-    [[1,1],[1,1]],
-    [[0,1,0],[1,1,1]],
-    [[1,0,0],[1,1,1]],
-    [[0,0,1],[1,1,1]]
+    [[1, 1, 1, 1]],                  // I
+    [[1, 1], [1, 1]],                // O
+    [[0, 1, 0], [1, 1, 1]],          // T
+    [[1, 0, 0], [1, 1, 1]],          // J/L-ish
+    [[0, 0, 1], [1, 1, 1]],          // L/J-ish
+    [[0, 1, 1], [1, 1, 0]],          // S
+    [[1, 1, 0], [0, 1, 1]]           // Z
   ];
 
-  let piece;
-  let pos;
-  let timer;
+  let piece = null;
+  let pos = null;
+  let timer = null;
+
   let score = 0;
   let lines = 0;
   let level = 1;
+  let dropSpeed = 650;
+
+  function drawSquare(x, y, cls) {
+    const d = document.createElement("div");
+    d.className = cls;
+    d.style.left = x * SIZE + "px";
+    d.style.top = y * SIZE + "px";
+    canvas.appendChild(d);
+  }
 
   function drawBoard() {
     canvas.innerHTML = "";
 
-    for (let y=0;y<ROWS;y++){
-      for (let x=0;x<COLS;x++){
-        if(board[y][x]){
-          drawSquare(x,y,"t-square");
-        }
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (board[y][x]) drawSquare(x, y, "t-square");
       }
     }
 
-    piece.shape.forEach((row,dy)=>{
-      row.forEach((v,dx)=>{
-        if(v){
-          drawSquare(pos.x+dx,pos.y+dy,"t-square active");
-        }
+    if (piece) {
+      piece.shape.forEach((row, dy) => {
+        row.forEach((v, dx) => {
+          if (v) drawSquare(pos.x + dx, pos.y + dy, "t-square t-active");
+        });
       });
-    });
-
-    scoreEl.innerText = score;
-    levelEl.innerText = level;
-    linesEl.innerText = lines;
-  }
-
-  function drawSquare(x,y,cls){
-    const d = document.createElement("div");
-    d.className = cls;
-    d.style.left = x*SIZE+"px";
-    d.style.top = y*SIZE+"px";
-    canvas.appendChild(d);
-  }
-
-  function spawn(){
-    const shape = shapes[Math.floor(Math.random()*shapes.length)];
-    piece = { shape };
-    pos = { x:3, y:0 };
-
-    if(collide()){
-      gameOver();
     }
+
+    scoreEl.innerText = String(score);
+    levelEl.innerText = String(level);
+    linesEl.innerText = String(lines);
   }
 
-  function collide(){
-    return piece.shape.some((row,dy)=>
-      row.some((v,dx)=>{
-        if(!v) return false;
-        const x = pos.x+dx;
-        const y = pos.y+dy;
-        return x<0 || x>=COLS || y>=ROWS || (y>=0 && board[y][x]);
+  function collide() {
+    return piece.shape.some((row, dy) =>
+      row.some((v, dx) => {
+        if (!v) return false;
+        const x = pos.x + dx;
+        const y = pos.y + dy;
+        return (
+          x < 0 || x >= COLS ||
+          y >= ROWS ||
+          (y >= 0 && board[y][x])
+        );
       })
     );
   }
 
-  function merge(){
-    piece.shape.forEach((row,dy)=>{
-      row.forEach((v,dx)=>{
-        if(v){
-          board[pos.y+dy][pos.x+dx]=1;
-        }
+  function spawn() {
+    const shape = shapes[Math.floor(Math.random() * shapes.length)];
+    piece = { shape };
+    pos = { x: 3, y: 0 };
+    if (collide()) gameOver();
+  }
+
+  function merge() {
+    piece.shape.forEach((row, dy) => {
+      row.forEach((v, dx) => {
+        if (v) board[pos.y + dy][pos.x + dx] = 1;
       });
     });
   }
 
-  function clearLines(){
-    let cleared=0;
+  function clearLines() {
+    let cleared = 0;
 
-    for(let y=ROWS-1;y>=0;y--){
-      if(board[y].every(v=>v)){
-        board.splice(y,1);
+    for (let y = ROWS - 1; y >= 0; y--) {
+      if (board[y].every(Boolean)) {
+        board.splice(y, 1);
         board.unshift(Array(COLS).fill(0));
         cleared++;
         y++;
       }
     }
 
-    if(cleared){
-      lines+=cleared;
-      score+=cleared*120;
+    if (cleared) {
+      lines += cleared;
+      score += cleared * 120;
 
-      if(lines>=level*6){
+      if (lines >= level * 6) {
         level++;
-        dropSpeed=Math.max(140,dropSpeed-60);
+        dropSpeed = Math.max(140, dropSpeed - 60);
       }
     }
   }
 
-  function rotate(){
-    const rotated = piece.shape[0].map((_,i)=>
-      piece.shape.map(r=>r[i]).reverse()
+  function rotate() {
+    const rotated = piece.shape[0].map((_, i) =>
+      piece.shape.map(r => r[i]).reverse()
     );
-
     const prev = piece.shape;
     piece.shape = rotated;
-
-    if(collide()){
-      piece.shape = prev;
-    }
+    if (collide()) piece.shape = prev;
   }
 
-  function move(dir){
-    pos.x+=dir;
-    if(collide()) pos.x-=dir;
+  function move(dir) {
+    pos.x += dir;
+    if (collide()) pos.x -= dir;
   }
 
-  function drop(){
+  function drop() {
     pos.y++;
-    if(collide()){
+    if (collide()) {
       pos.y--;
       merge();
       clearLines();
@@ -2718,115 +2654,97 @@ function gameTetris(root) {
     }
   }
 
-  let dropSpeed = 650;
-
-  function loop(){
-    if(!running || disposed) return;
-
+  function loop() {
+    if (!running || disposed) return;
     drop();
     drawBoard();
-    timer=setTimeout(loop,dropSpeed);
+    timer = setTimeout(loop, dropSpeed);
   }
 
-  function start(){
-    running=true;
+  function start() {
+    running = true;
+    score = 0;
+    lines = 0;
+    level = 1;
+    dropSpeed = 650;
+    for (let y = 0; y < ROWS; y++) board[y].fill(0);
     spawn();
+    drawBoard();
     loop();
   }
 
-  function gameOver(){
+  function payout() {
+    const hearts = clamp(Math.floor(score / 150) + 8, 8, 60);
+    const affection = clamp(Math.floor(score / 420) + 4, 4, 30);
 
-    running=false;
-    clearTimeout(timer);
+    addRewards?.(hearts, affection);
 
-    canvas.innerHTML =
-    `<div style="
-        position:absolute;
-        inset:0;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:800;
-        background:rgba(255,255,255,.75);
-        border-radius:18px;
-     ">
-       GAME OVER<br>Score ${score}
-     </div>`;
-
-    restartBtn.style.display="inline-block";
-
-    payout();
-  }
-
-  function payout(){
-
-    const hearts = clamp(Math.floor(score/150)+8,8,60);
-    const affection = clamp(Math.floor(score/420)+4,4,30);
-
-    if(typeof addRewards==="function"){
-      addRewards(hearts,affection);
-    }
-
-    if(score>900){
-      setMood?.("happy",{persist:true});
-    }else if(score<250 && Math.random()<.35){
-      setMood?.("sad",{persist:true});
-    }
+    if (score >= 900) setMood?.("happy", { persist: true });
+    else if (score <= 250 && Math.random() < 0.35) setMood?.("sad", { persist: true });
 
     maybePopup?.("afterGame");
   }
 
-  function keyHandler(e){
-    if(!running) return;
+  function gameOver() {
+    running = false;
+    clearTimeout(timer);
 
-    if(e.key==="ArrowLeft") move(-1);
-    if(e.key==="ArrowRight") move(1);
-    if(e.key==="ArrowUp") rotate();
-    if(e.key==="ArrowDown") drop();
+    canvas.innerHTML = `
+      <div style="
+        position:absolute; inset:0;
+        display:flex; align-items:center; justify-content:center;
+        text-align:center;
+        font-weight:800;
+        background:rgba(255,255,255,.75);
+        border-radius:18px;
+      ">
+        GAME OVER<br><span style="font-weight:700; font-size:12px;">Score ${score} • Lines ${lines}</span>
+      </div>
+    `;
+
+    restartBtn.style.display = "inline-block";
+    payout();
+  }
+
+  function keyHandler(e) {
+    if (!running) return;
+
+    if (e.key === "ArrowLeft") move(-1);
+    if (e.key === "ArrowRight") move(1);
+    if (e.key === "ArrowUp") rotate();
+    if (e.key === "ArrowDown") drop();
 
     drawBoard();
   }
 
-  document.addEventListener("keydown",keyHandler);
+  document.addEventListener("keydown", keyHandler);
 
-  startBtn.onclick=()=>{
-    if(running) return;
-    restartBtn.style.display="none";
+  startBtn.onclick = () => {
+    touchAction();
+    if (running) return;
+    restartBtn.style.display = "none";
     start();
   };
 
-  restartBtn.onclick=()=>{
-    running=false;
-    clearTimeout(timer);
-
-    for(let y=0;y<ROWS;y++){
-      board[y].fill(0);
-    }
-
-    score=0;
-    lines=0;
-    level=1;
-    dropSpeed=650;
-
+  restartBtn.onclick = () => {
+    touchAction();
+    restartBtn.style.display = "none";
     start();
   };
 
-  stopCurrentGame=()=>{
-    disposed=true;
-    running=false;
+  stopCurrentGame = () => {
+    disposed = true;
+    running = false;
     clearTimeout(timer);
-    document.removeEventListener("keydown",keyHandler);
+    document.removeEventListener("keydown", keyHandler);
     wrap.classList.add("hidden");
-    isMiniGameRunning=false;
+    isMiniGameRunning = false;
   };
 }
 
-/***********************
-  Mini Game: Hangman (UPDATED)
-  - Shows underscores for unguessed letters
-  - Adds clickable on-screen keyboard
-  - Keeps typing support
-************************/
+/* -------------------------------------------------------
+  Mini Game: Hangman (underscores + clickable keyboard)
+-------------------------------------------------------- */
 function gameHangman(root) {
   touchAction();
   $("gameTitle").innerText = "🧩 Hangman";
@@ -2835,7 +2753,7 @@ function gameHangman(root) {
   const wrap = document.getElementById("hangmanWrap");
 
   if (!wrap) {
-    root.innerHTML = `<div class="game-frame">Missing #hangmanWrap HTML. Paste the Hangman HTML block once into your page.</div>`;
+    root.innerHTML = `<div class="game-frame">Missing #hangmanWrap HTML.</div>`;
     isMiniGameRunning = false;
     return;
   }
@@ -2843,7 +2761,6 @@ function gameHangman(root) {
   wrap.classList.remove("hidden");
   root.appendChild(wrap);
 
-  // Elements (guarded)
   const wordElement = document.getElementById("word");
   const wrongLettersElement = document.getElementById("wrong-letters");
   const playAgainButton = document.getElementById("play-button");
@@ -2857,22 +2774,15 @@ function gameHangman(root) {
   const earnedAffectionEl = document.getElementById("aEarned");
   const restartBtn = document.getElementById("hRestartBtn");
 
-  // NEW: keyboard mount
   const kbdMount = document.getElementById("hKeyboard");
 
-  // If any required element is missing, fail gracefully
   const required = [
-    wordElement,
-    wrongLettersElement,
-    playAgainButton,
-    popup,
-    notification,
-    finalMessage,
-    finalMessageRevealWord,
+    wordElement, wrongLettersElement, playAgainButton,
+    popup, notification, finalMessage, finalMessageRevealWord,
     kbdMount
   ];
   if (required.some((x) => !x) || figureParts.length === 0) {
-    root.innerHTML = `<div class="game-frame">Hangman HTML is incomplete (missing IDs or .figure-part). Check the hangmanWrap block.</div>`;
+    root.innerHTML = `<div class="game-frame">Hangman HTML is incomplete (missing IDs or .figure-part or #hKeyboard).</div>`;
     isMiniGameRunning = false;
     wrap.classList.add("hidden");
     return;
@@ -2881,20 +2791,15 @@ function gameHangman(root) {
   const words = [
     "romance","adore","devotion","sweetheart","passion","darling",
     "forever","cuddle","affection","heartbeat","intimacy","embrace",
-    "Totobop","Afi","Ddiddicop","soulmate","together","love"
+    "totobop","afi","ddiddicop","soulmate","together","love"
   ];
 
   let selectedWord = words[Math.floor(Math.random() * words.length)];
   let playable = true;
   const correctLetters = [];
   const wrongLetters = [];
-
   let disposed = false;
   let payoutDone = false;
-
-  // -------- helpers --------
-  const normalizeWord = (w) => String(w || "").toLowerCase();
-  const normalizedSelected = () => normalizeWord(selectedWord);
 
   function showNotification() {
     notification.classList.add("show");
@@ -2905,15 +2810,38 @@ function gameHangman(root) {
     return correctLetters.includes(letter) || wrongLetters.includes(letter);
   }
 
-  function setKeyState(letter) {
-    const btn = kbdMount.querySelector(`[data-letter="${letter}"]`);
-    if (!btn) return;
+  function buildKeyboard() {
+    const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
+    kbdMount.innerHTML = rows.map((row) => {
+      const keys = row.split("").map((ch) =>
+        `<button type="button" class="h-kbdKey" data-letter="${ch}">${ch.toUpperCase()}</button>`
+      ).join("");
+      return `<div class="h-kbdRow">${keys}</div>`;
+    }).join("");
 
+    const onClick = (e) => {
+      const btn = e.target?.closest?.("button[data-letter]");
+      if (!btn) return;
+      handleGuess(btn.getAttribute("data-letter"));
+    };
+
+    buildKeyboard._onClick = onClick;
+    kbdMount.addEventListener("click", onClick);
+  }
+
+  function unbindKeyboard() {
+    if (buildKeyboard._onClick) {
+      kbdMount.removeEventListener("click", buildKeyboard._onClick);
+      buildKeyboard._onClick = null;
+    }
+  }
+
+  function setKeyState(letter, ok) {
+    const btn = kbdMount.querySelector(`button[data-letter="${letter}"]`);
+    if (!btn) return;
     btn.disabled = true;
     btn.classList.remove("is-correct", "is-wrong");
-
-    if (normalizedSelected().includes(letter)) btn.classList.add("is-correct");
-    else btn.classList.add("is-wrong");
+    btn.classList.add(ok ? "is-correct" : "is-wrong");
   }
 
   function resetKeyboard() {
@@ -2923,59 +2851,17 @@ function gameHangman(root) {
     });
   }
 
-  function buildKeyboard() {
-    // simple 3-row layout to match “cute keyboard” vibe
-    const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
-
-    kbdMount.innerHTML = rows
-      .map((row) => {
-        const keys = row
-          .split("")
-          .map(
-            (ch) =>
-              `<button type="button" class="h-kbdKey btn kbd" data-letter="${ch}" aria-label="letter ${ch}">${ch.toUpperCase()}</button>`
-          )
-          .join("");
-        return `<div class="h-kbdRow">${keys}</div>`;
-      })
-      .join("");
-
-    // click handler (delegated)
-    const onKbdClick = (e) => {
-      const t = e.target;
-      if (!(t instanceof HTMLElement)) return;
-      const letter = t.getAttribute("data-letter");
-      if (!letter) return;
-      handleGuess(letter);
-    };
-
-    // store for cleanup
-    buildKeyboard._onKbdClick = onKbdClick;
-    kbdMount.addEventListener("click", onKbdClick);
-  }
-
-  function unbindKeyboard() {
-    if (buildKeyboard._onKbdClick) {
-      kbdMount.removeEventListener("click", buildKeyboard._onKbdClick);
-      buildKeyboard._onKbdClick = null;
-    }
-  }
-
   function displayWord() {
-    const target = normalizedSelected();
-
-    // Show underscores for unknown letters
-    wordElement.innerHTML = target
+    wordElement.innerHTML = selectedWord
       .split("")
-      .map((letter) => {
-        const shown = correctLetters.includes(letter) ? letter.toUpperCase() : "_";
-        // use &nbsp; to keep spacing consistent
+      .map((ch) => {
+        const shown = correctLetters.includes(ch) ? ch.toUpperCase() : "";
+        // IMPORTANT: show the line even when empty (via CSS)
         return `<span class="h-letter">${shown}</span>`;
       })
       .join("");
 
-    // win check (compare guessed letters against target)
-    const won = target.split("").every((ch) => correctLetters.includes(ch));
+    const won = selectedWord.split("").every((ch) => correctLetters.includes(ch));
     if (won) {
       finalMessage.innerText = "You won 💗";
       finalMessageRevealWord.innerText = "";
@@ -2998,7 +2884,7 @@ function gameHangman(root) {
 
     if (errors === figureParts.length) {
       finalMessage.innerText = "You lost 😭";
-      finalMessageRevealWord.innerText = `The word was: ${selectedWord}`;
+      finalMessageRevealWord.innerText = `The word was: ${selectedWord.toUpperCase()}`;
       popup.style.display = "block";
       playable = false;
       if (!payoutDone) payout(false);
@@ -3017,18 +2903,18 @@ function gameHangman(root) {
     if (won) {
       hearts = clamp(18 + remaining * 6, 18, 60);
       affection = clamp(10 + remaining * 3, 10, 35);
-      setMood("happy", { persist: true });
+      setMood?.("happy", { persist: true });
     } else {
       hearts = clamp(8 + Math.max(0, remaining) * 2, 8, 22);
       affection = clamp(4 + Math.max(0, remaining), 4, 14);
-      if (Math.random() < 0.35) setMood("sad", { persist: true });
+      if (Math.random() < 0.35) setMood?.("sad", { persist: true });
     }
 
-    addRewards(hearts, affection);
+    addRewards?.(hearts, affection);
     if (earnedHeartsEl) earnedHeartsEl.innerText = String(hearts);
     if (earnedAffectionEl) earnedAffectionEl.innerText = String(affection);
 
-    maybePopup("afterGame");
+    maybePopup?.("afterGame");
   }
 
   function handleGuess(rawLetter) {
@@ -3042,15 +2928,15 @@ function gameHangman(root) {
       return;
     }
 
-    if (normalizedSelected().includes(letter)) {
+    if (selectedWord.includes(letter)) {
       correctLetters.push(letter);
+      setKeyState(letter, true);
       displayWord();
     } else {
       wrongLetters.push(letter);
+      setKeyState(letter, false);
       updateWrongLettersElement();
     }
-
-    setKeyState(letter);
   }
 
   function resetGame() {
@@ -3075,14 +2961,12 @@ function gameHangman(root) {
 
   function onKeyPress(e) {
     if (disposed || !playable) return;
-
     const letter = (e.key || "").toLowerCase();
     if (letter < "a" || letter > "z") return;
-
     handleGuess(letter);
   }
 
-  // ---------- init UI ----------
+  // init UI
   popup.style.display = "none";
   notification.classList.remove("show");
   wrongLettersElement.innerHTML = "";
@@ -3093,17 +2977,8 @@ function gameHangman(root) {
   buildKeyboard();
   window.addEventListener("keypress", onKeyPress);
 
-  playAgainButton.onclick = () => {
-    touchAction();
-    resetGame();
-  };
-
-  if (restartBtn) {
-    restartBtn.onclick = () => {
-      touchAction();
-      resetGame();
-    };
-  }
+  playAgainButton.onclick = () => { touchAction(); resetGame(); };
+  if (restartBtn) restartBtn.onclick = () => { touchAction(); resetGame(); };
 
   displayWord();
   updateWrongLettersElement();
@@ -3117,6 +2992,41 @@ function gameHangman(root) {
     isMiniGameRunning = false;
   };
 }
+
+/* -------------------------------------------------------
+  IMPORTANT FIX: your menu button routing
+  Make sure Stack Yo Block calls gameTetris, not gameQuiz.
+-------------------------------------------------------- */
+function launchMiniGame(gameKey) {
+  const root = document.getElementById("gameArea") || document.getElementById("gameRoot");
+  if (!root) return;
+
+  // close any running game
+  if (typeof stopCurrentGame === "function") stopCurrentGame();
+  isMiniGameRunning = true;
+
+  const games = {
+    quiz: gameQuiz,
+    tetris: gameTetris,
+    hangman: gameHangman,
+  };
+
+  const fn = games[gameKey];
+  if (!fn) {
+    root.innerHTML = `<div class="game-frame">Unknown game: ${gameKey}</div>`;
+    isMiniGameRunning = false;
+    return;
+  }
+
+  fn(root);
+}
+
+/* Example bindings (edit IDs to match your buttons)
+document.getElementById("btnQuiz").onclick = () => launchMiniGame("quiz");
+document.getElementById("btnTetris").onclick = () => launchMiniGame("tetris");   // <-- THIS IS THE CRITICAL ONE
+document.getElementById("btnHangman").onclick = () => launchMiniGame("hangman");
+*/
+
 
 
 /***********************
@@ -3748,6 +3658,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
