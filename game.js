@@ -1504,9 +1504,7 @@ function startGame(key) {
   // NEW games
   if (key === "quiz") return gameQuiz(area);
   if (key === "tetris") return gameTetris(area);
-  if (key === "zoom") return gameZoom(area);
-  if (key === "balance") return gameBalance(area);
-  if (key === "cake") return gameCake(area);
+  if (key === "hangman") return gameHangman(area);
 }
 
 /* Game 1: Catch the Hearts */
@@ -3087,7 +3085,228 @@ function gameTetris(root) {
     if (score >= 1200 || lines >= 10) setMood("happy", { persist: true });
     else if (score <= 250 && Math.random() < 0.35) setMood(
 
-      
+/***********************
+  Mini Game: Hangman
+************************/
+function gameHangman(root) {
+  touchAction();
+  $("gameTitle").innerText = "🧩 Hangman";
+
+  root.innerHTML = "";
+  const wrap = document.getElementById("hangmanWrap");
+  if (!wrap) {
+    root.innerHTML = `<div class="game-frame">Missing #hangmanWrap HTML. Paste the HTML block once into your page.</div>`;
+    isMiniGameRunning = false;
+    return;
+  }
+  wrap.classList.remove("hidden");
+  root.appendChild(wrap);
+
+  // Required elements (same IDs as your script)
+  const wordElement = document.getElementById("word");
+  const wrongLettersElement = document.getElementById("wrong-letters");
+  const playAgainButton = document.getElementById("play-button");
+  const popup = document.getElementById("popup-container");
+  const notification = document.getElementById("notification-container");
+  const finalMessage = document.getElementById("final-message");
+  const finalMessageRevealWord = document.getElementById("final-message-reveal-word");
+  const figureParts = document.querySelectorAll("#hangmanWrap .figure-part");
+
+  const earnedHeartsEl = document.getElementById("hEarned");
+  const earnedAffectionEl = document.getElementById("aEarned");
+  const restartBtn = document.getElementById("hRestartBtn");
+
+  // Reset UI
+  popup.style.display = "none";
+  notification.classList.remove("show");
+  wrongLettersElement.innerHTML = "";
+  earnedHeartsEl.innerText = "0";
+  earnedAffectionEl.innerText = "0";
+  figureParts.forEach((p) => (p.style.display = "none"));
+
+  // Words (you can swap these anytime)
+  const words = [
+    "application",
+    "programming",
+    "interface",
+    "wizard",
+    "element",
+    "prototype",
+    "callback",
+    "undefined",
+    "arguments",
+    "settings",
+    "selector",
+    "container",
+    "instance",
+    "response",
+    "console",
+    "constructor",
+    "token",
+    "function",
+    "return",
+    "length",
+    "type",
+    "node",
+  ];
+
+  let selectedWord = words[Math.floor(Math.random() * words.length)];
+  let playable = true;
+  const correctLetters = [];
+  const wrongLetters = [];
+
+  let disposed = false;
+  let payoutDone = false;
+
+  function showNotification() {
+    notification.classList.add("show");
+    setTimeout(() => {
+      notification.classList.remove("show");
+    }, 1200);
+  }
+
+  function displayWord() {
+    wordElement.innerHTML = `
+      ${selectedWord
+        .split("")
+        .map(
+          (letter) => `
+            <span class="h-letter">${correctLetters.includes(letter) ? letter : ""}</span>
+          `
+        )
+        .join("")}
+    `;
+
+    const innerWord = wordElement.innerText.replace(/\n/g, "");
+    if (innerWord === selectedWord) {
+      finalMessage.innerText = "You won 💗";
+      finalMessageRevealWord.innerText = "";
+      popup.style.display = "block";
+      playable = false;
+      if (!payoutDone) payout(true);
+    }
+  }
+
+  function updateWrongLettersElement() {
+    wrongLettersElement.innerHTML = `
+      ${wrongLetters.length > 0 ? "<p style='margin:0 0 6px 0; font-weight:700;'>Wrong</p>" : ""}
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${wrongLetters.map((letter) => `<span class="h-wrong">${letter}</span>`).join("")}
+      </div>
+    `;
+
+    figureParts.forEach((part, index) => {
+      const errors = wrongLetters.length;
+      part.style.display = index < errors ? "block" : "none";
+    });
+
+    if (wrongLetters.length === figureParts.length) {
+      finalMessage.innerText = "You lost 😭";
+      finalMessageRevealWord.innerText = `The word was: ${selectedWord}`;
+      popup.style.display = "block";
+      playable = false;
+      if (!payoutDone) payout(false);
+    }
+  }
+
+  function payout(won) {
+    payoutDone = true;
+
+    const mistakes = wrongLetters.length; // 0..6
+    const remaining = figureParts.length - mistakes;
+
+    let hearts = 0;
+    let affection = 0;
+
+    if (won) {
+      hearts = clamp(18 + remaining * 6, 18, 60);
+      affection = clamp(10 + remaining * 3, 10, 35);
+      setMood("happy", { persist: true });
+    } else {
+      hearts = clamp(8 + Math.max(0, remaining) * 2, 8, 22);
+      affection = clamp(4 + Math.max(0, remaining), 4, 14);
+      if (Math.random() < 0.35) setMood("sad", { persist: true });
+    }
+
+    addRewards(hearts, affection);
+    earnedHeartsEl.innerText = String(hearts);
+    earnedAffectionEl.innerText = String(affection);
+
+    maybePopup("afterGame");
+  }
+
+  function resetGame(newWord) {
+    playable = true;
+    payoutDone = false;
+
+    correctLetters.splice(0);
+    wrongLetters.splice(0);
+
+    selectedWord = newWord || words[Math.floor(Math.random() * words.length)];
+
+    popup.style.display = "none";
+    wrongLettersElement.innerHTML = "";
+    earnedHeartsEl.innerText = "0";
+    earnedAffectionEl.innerText = "0";
+
+    figureParts.forEach((p) => (p.style.display = "none"));
+
+    displayWord();
+    updateWrongLettersElement();
+  }
+
+  // Key handler (saved so we can remove it on cleanup)
+  function onKeyPress(e) {
+    if (disposed) return;
+    if (!playable) return;
+
+    const letter = (e.key || "").toLowerCase();
+    if (letter < "a" || letter > "z") return;
+
+    if (selectedWord.includes(letter)) {
+      if (!correctLetters.includes(letter)) {
+        correctLetters.push(letter);
+        displayWord();
+      } else {
+        showNotification();
+      }
+    } else {
+      if (!wrongLetters.includes(letter)) {
+        wrongLetters.push(letter);
+        updateWrongLettersElement();
+      } else {
+        showNotification();
+      }
+    }
+  }
+
+  window.addEventListener("keypress", onKeyPress);
+
+  // Buttons
+  playAgainButton.onclick = () => {
+    touchAction();
+    resetGame();
+  };
+
+  restartBtn.onclick = () => {
+    touchAction();
+    resetGame();
+  };
+
+  // Init
+  displayWord();
+  updateWrongLettersElement();
+
+  // Cleanup when switching games
+  stopCurrentGame = () => {
+    disposed = true;
+    playable = false;
+    window.removeEventListener("keypress", onKeyPress);
+    wrap.classList.add("hidden");
+    isMiniGameRunning = false;
+  };
+}
+
 
 
 /***********************
@@ -4176,6 +4395,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
