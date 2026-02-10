@@ -2622,24 +2622,21 @@ function gameQuiz(root) {
 }
 
 /***********************
-  Mini Game: Minesweeper (REALLY FIXED)
-  Fixes:
-  1) “Clicking one tile reveals multiple numbered tiles”
-     - That was happening because the 0-flood reveal is supposed to reveal many tiles,
-       BUT it was also re-triggering from duplicate events (pointerup + click).
-     - Now we handle ONLY ONE activation per pointer interaction and ignore duplicates.
+  Mini Game: Minesweeper (ACTUALLY FIXED FOR MOBILE)
 
-  2) Flag button “doesn’t work”
-     - Common cause: the board click handler fires twice and immediately reveals/overwrites the flag,
-       or the UI doesn’t clearly show flag-mode.
-     - Now flag mode is reliable, updates button label, and flagged tiles won’t reveal.
+  Fixes:
+  - No more “one tap triggers multiple tiles”
+    -> We handle ONLY pointerdown (single activation), and lock per pointerId.
+  - No more “sometimes it doesn't click”
+    -> pointerdown is immediate and reliable; pointer capture prevents drift issues.
+  - No more pointerup + click duplication
+    -> We do not use click for actions; we suppress ghost clicks.
 
   Notes:
-  - Uses ONE board-level event listener (event delegation) instead of per-tile listeners.
-  - Uses pointerup only, and suppresses the follow-up click via a short “click guard”.
+  - Flood-fill revealing multiple tiles for 0s is correct behavior.
 ************************/
 function gameMinesweeper(root) {
-  touchAction();
+  touchAction?.();
   $("gameTitle").innerText = "💣 Minesweeper";
 
   root.innerHTML = `
@@ -2651,7 +2648,7 @@ function gameMinesweeper(root) {
           <button id="flag-button" type="button" class="btn" aria-pressed="false">🚩 Flag: OFF</button>
           <button id="ms-restart" type="button" class="btn">Restart</button>
         </div>
-        <div style="opacity:.7; font-size:13px;">Tip: turn on 🚩 then click tiles to flag</div>
+        <div style="opacity:.7; font-size:13px;">Tip: turn on 🚩 then tap tiles to flag</div>
       </div>
 
       <div id="board" class="ms-board" aria-label="mines board"></div>
@@ -2678,15 +2675,16 @@ function gameMinesweeper(root) {
   boardEl.style.justifyContent = "center";
   boardEl.style.alignContent = "start";
   boardEl.style.userSelect = "none";
-  boardEl.style.touchAction = "manipulation";
+
+  // Important for mobile reliability: avoid taps turning into scroll/zoom gestures
+  boardEl.style.touchAction = "none";
 
   let rows = 8;
   let columns = 8;
 
   let minesCount = 10;
-  let minesSet = new Set(); // faster
+  let minesSet = new Set();
 
-  // Per-cell state arrays (more reliable than innerText/class checks)
   let revealed = [];
   let flagged = [];
   let neighborMines = [];
@@ -2696,10 +2694,10 @@ function gameMinesweeper(root) {
   let gameOver = false;
   let disposed = false;
 
-  // Guard against duplicate activation (pointerup then click)
-  let clickGuardUntil = 0;
+  // ---- pointer locking (prevents double triggers) ----
+  let activePointerId = null;
+  let actionLockUntil = 0;
 
-  // -------- helpers --------
   const inBounds = (r, c) => r >= 0 && r < rows && c >= 0 && c < columns;
 
   function idFor(r, c) {
@@ -2720,22 +2718,20 @@ function gameMinesweeper(root) {
 
   function setMines() {
     minesSet = new Set();
-    let minesLeft = minesCount;
-
-    while (minesLeft > 0) {
+    let left = minesCount;
+    while (left > 0) {
       const r = Math.floor(Math.random() * rows);
       const c = Math.floor(Math.random() * columns);
       const id = idFor(r, c);
       if (!minesSet.has(id)) {
         minesSet.add(id);
-        minesLeft--;
+        left--;
       }
     }
   }
 
   function computeNeighborCounts() {
     neighborMines = Array.from({ length: rows }, () => Array(columns).fill(0));
-
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < columns; c++) {
         let count = 0;
@@ -2753,7 +2749,7 @@ function gameMinesweeper(root) {
   }
 
   function tileEl(r, c) {
-    return boardEl.querySelector(`button[data-r="${r}"][data-c="${c}"]`);
+    return boardEl.querySelector(`button.ms-tile[data-r="${r}"][data-c="${c}"]`);
   }
 
   function revealAllMines() {
@@ -2794,7 +2790,7 @@ function gameMinesweeper(root) {
       el.classList.add("x" + String(n));
     } else {
       el.innerText = "";
-      // flood fill for zeros (this WILL reveal multiple tiles and that’s correct)
+      // flood fill zeros (correct behavior)
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
           if (dr === 0 && dc === 0) continue;
@@ -2807,6 +2803,7 @@ function gameMinesweeper(root) {
   function toggleFlag(r, c) {
     if (!inBounds(r, c)) return;
     if (revealed[r][c]) return;
+
     const el = tileEl(r, c);
     if (!el) return;
 
@@ -2841,35 +2838,46 @@ function gameMinesweeper(root) {
     if (tilesRevealed >= safeTotal) markCleared();
   }
 
-  // -------- event handlers --------
-  function onBoardPointerUp(e) {
+  // -------- event handlers (ONLY pointerdown for board actions) --------
+  function onBoardPointerDown(e) {
     if (disposed) return;
+
+    // Only primary button / primary touch
+    if (typeof e.button === "number" && e.button !== 0) return;
+
     const btn = e.target?.closest?.("button.ms-tile");
     if (!btn) return;
+
+    // Lock: one action per pointer interaction
+    const now = Date.now();
+    if (now < actionLockUntil) return;
+
+    if (activePointerId !== null && activePointerId !== e.pointerId) return;
+    activePointerId = e.pointerId;
+    actionLockUntil = now + 180;
 
     e.preventDefault?.();
     e.stopPropagation?.();
 
-    // block the follow-up click event
-    clickGuardUntil = Date.now() + 350;
+    // Capture pointer so drift doesn't cancel the interaction
+    boardEl.setPointerCapture?.(e.pointerId);
 
     const r = parseInt(btn.getAttribute("data-r"), 10);
     const c = parseInt(btn.getAttribute("data-c"), 10);
     handleTileAction(r, c);
   }
 
-  function onBoardClick(e) {
-    // If pointerup already handled it, ignore this click.
-    if (Date.now() < clickGuardUntil) return;
-    const btn = e.target?.closest?.("button.ms-tile");
-    if (!btn) return;
+  function releasePointer(e) {
+    if (activePointerId === e.pointerId) {
+      activePointerId = null;
+      try { boardEl.releasePointerCapture?.(e.pointerId); } catch (_) {}
+    }
+  }
 
+  // Suppress “ghost click” events entirely (mobile browsers may still fire them)
+  function suppressClick(e) {
     e.preventDefault?.();
     e.stopPropagation?.();
-
-    const r = parseInt(btn.getAttribute("data-r"), 10);
-    const c = parseInt(btn.getAttribute("data-c"), 10);
-    handleTileAction(r, c);
   }
 
   function onFlagClick() {
@@ -2900,7 +2908,6 @@ function gameMinesweeper(root) {
         tile.setAttribute("data-r", String(r));
         tile.setAttribute("data-c", String(c));
         tile.setAttribute("aria-label", `tile ${r + 1}, ${c + 1}`);
-        tile.style.touchAction = "manipulation";
 
         tile.style.width = "36px";
         tile.style.height = "36px";
@@ -2914,29 +2921,37 @@ function gameMinesweeper(root) {
         tile.style.boxShadow = "0 10px 25px rgba(255, 100, 150, .18)";
         tile.style.cursor = "pointer";
 
+        // Prevent browser from treating press as text selection, etc.
+        tile.style.touchAction = "none";
+
         boardEl.appendChild(tile);
       }
     }
   }
 
-  // Attach (single) listeners
-  boardEl.addEventListener("pointerup", onBoardPointerUp, { passive: false });
-  boardEl.addEventListener("click", onBoardClick);
+  // Attach listeners
+  boardEl.addEventListener("pointerdown", onBoardPointerDown, { passive: false });
+  boardEl.addEventListener("pointerup", releasePointer, { passive: true });
+  boardEl.addEventListener("pointercancel", releasePointer, { passive: true });
+  boardEl.addEventListener("click", suppressClick, { passive: false });
+
   flagBtn.addEventListener("click", onFlagClick);
   restartBtn.addEventListener("click", buildBoard);
 
-  // Init
   buildBoard();
 
   stopCurrentGame = () => {
     disposed = true;
-    boardEl.removeEventListener("pointerup", onBoardPointerUp);
-    boardEl.removeEventListener("click", onBoardClick);
+    boardEl.removeEventListener("pointerdown", onBoardPointerDown);
+    boardEl.removeEventListener("pointerup", releasePointer);
+    boardEl.removeEventListener("pointercancel", releasePointer);
+    boardEl.removeEventListener("click", suppressClick);
     flagBtn.removeEventListener("click", onFlagClick);
     restartBtn.removeEventListener("click", buildBoard);
     isMiniGameRunning = false;
   };
 }
+
 
 
 /***********************
@@ -4439,6 +4454,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
