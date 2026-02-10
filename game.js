@@ -3231,6 +3231,586 @@ function gameHangman(root) {
 }
 
 /***********************
+  TRIAL 2: Dakgalbi (timing) — FIXED + MOBILE
+  - Space OR tap/click the meter OR press on-screen button
+  - Prevents double-trigger (touch -> click) with a guard
+  - Cleans up listeners on exit
+************************/
+function trialDakgalbi(root) {
+  $("gameTitle").innerText = "🍲 Trial: Make Perfect Dakgalbi";
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <div class="row">
+        <div>Press <span class="kbd">Space</span> or tap when heat is PERFECT • 3 rounds</div>
+        <div>Perfect: <strong id="dakPerfect">0</strong>/3</div>
+      </div>
+
+      <div id="dakPanel" style="margin-top:14px; padding:12px; border-radius:16px; background:rgba(255,255,255,.72); border:1px dashed rgba(255,77,136,.35);">
+        <div class="small" style="white-space:pre-line;">
+Heat meter moves back and forth.
+Hit the sweet spot (the PINK zone).
+No restart button if you fail.
+        </div>
+
+        <div id="dakBar" style="height:18px; background:rgba(0,0,0,.08); border-radius:999px; overflow:hidden; margin-top:12px; position:relative;">
+          <div id="dakSweet" style="position:absolute; left:42%; width:16%; top:0; bottom:0; background:rgba(255,77,136,.35);"></div>
+          <div id="dakNeedle" style="position:absolute; width:10px; top:-6px; bottom:-6px; background:rgba(255,77,136,.95); border-radius:8px;"></div>
+        </div>
+
+        <div class="center" style="margin-top:12px;">
+          <button class="btn" id="dakPress" type="button" style="min-width:180px;">🔥 HEAT!</button>
+        </div>
+
+        <div class="center small" style="margin-top:10px;" id="dakMsg"></div>
+      </div>
+
+      <div class="center" style="margin-top:12px;">
+        <button class="btn ghost" id="dakLeave" type="button">Leave</button>
+      </div>
+    </div>
+  `;
+
+  const needle = $("dakNeedle");
+  const msg = $("dakMsg");
+  const perfectEl = $("dakPerfect");
+  const panel = $("dakPanel");
+  const pressBtn = $("dakPress");
+  const leaveBtn = $("dakLeave");
+
+  if (!needle || !msg || !perfectEl || !panel || !pressBtn || !leaveBtn) {
+    // Fail safe
+    root.innerHTML = `<div class="game-frame">Dakgalbi trial UI is missing required elements.</div>`;
+    isTrialRunning = false;
+    isMiniGameRunning = false;
+    return;
+  }
+
+  let running = true;
+  let rounds = 0;
+  let perfect = 0;
+
+  // meter position 0..1
+  let x = 0.05;
+  let dir = 1;
+  let speed = 0.85;
+
+  // guards to avoid double trigger on mobile (pointer + click)
+  let pressGuardUntil = 0;
+
+  function inSweetSpot(v) {
+    return v >= 0.42 && v <= 0.58;
+  }
+
+  function updateUI() {
+    needle.style.left = `${Math.round(x * 100)}%`;
+    perfectEl.innerText = String(perfect);
+  }
+
+  function nextRoundText() {
+    msg.innerText = `Round ${rounds + 1}/3… wait…`;
+  }
+
+  function tick() {
+    if (!running) return;
+    x += dir * speed * 0.012;
+    if (x >= 0.95) { x = 0.95; dir = -1; }
+    if (x <= 0.05) { x = 0.05; dir = 1; }
+    updateUI();
+    requestAnimationFrame(tick);
+  }
+
+  function press() {
+    if (!running) return;
+
+    // prevent accidental double presses (tap -> click)
+    const now = Date.now();
+    if (now < pressGuardUntil) return;
+    pressGuardUntil = now + 250;
+
+    touchAction?.();
+
+    rounds++;
+    const ok = inSweetSpot(x);
+
+    if (ok) {
+      perfect++;
+      msg.innerText = "Perfect heat 🔥💗";
+      setMood?.("happy", { persist: true });
+    } else {
+      msg.innerText = "Oops… too spicy / too cold 😭";
+      if (Math.random() < 0.35) setMood?.("sad", { persist: true });
+    }
+
+    updateUI();
+
+    if (rounds >= 3) {
+      end();
+    } else {
+      speed += 0.18;
+      setTimeout(() => {
+        if (!running) return;
+        nextRoundText();
+      }, 650);
+    }
+  }
+
+  function end() {
+    running = false;
+
+    const passed = perfect >= 2;
+
+    msg.innerText = passed
+      ? "Dakgalbi is PERFECT. Minyoung is impressed 😳💗"
+      : "Dakgalbi is… questionable. Try again later 🥺";
+
+    leaveBtn.className = "btn";
+    leaveBtn.innerText = passed ? "Continue" : "Back to Mini Games";
+    leaveBtn.onclick = () => {
+      touchAction?.();
+      finishStageTrial?.(2, passed);
+      showView?.("minigames");
+    };
+
+    cleanup();
+  }
+
+  function onKeyDown(e) {
+    if (e.code === "Space") {
+      e.preventDefault();
+      press();
+    }
+  }
+
+  // Mobile-friendly: press anywhere on panel OR button
+  function onPanelPointerUp(e) {
+    // Ignore taps on the Leave button itself
+    if (e.target && e.target.closest && e.target.closest("#dakLeave")) return;
+    e.preventDefault?.();
+    press();
+  }
+
+  function onLeaveClick() {
+    touchAction?.();
+    finishStageTrial?.(2, false);
+    showView?.("minigames");
+    cleanup();
+  }
+
+  function cleanup() {
+    window.removeEventListener("keydown", onKeyDown);
+    panel.removeEventListener("pointerup", onPanelPointerUp);
+    pressBtn.removeEventListener("click", press);
+    pressBtn.removeEventListener("pointerup", press);
+    leaveBtn.removeEventListener("click", onLeaveClick);
+
+    stopCurrentGame = () => {}; // no-op
+    isTrialRunning = false;
+    isMiniGameRunning = false;
+  }
+
+  // bind
+  window.addEventListener("keydown", onKeyDown);
+  panel.addEventListener("pointerup", onPanelPointerUp, { passive: false });
+  pressBtn.addEventListener("click", press);
+  pressBtn.addEventListener("pointerup", (e) => { e.preventDefault?.(); press(); }, { passive: false });
+  leaveBtn.addEventListener("click", onLeaveClick);
+
+  stopCurrentGame = () => {
+    running = false;
+    cleanup();
+  };
+
+  nextRoundText();
+  requestAnimationFrame(tick);
+}
+
+
+/***********************
+  TRIAL 3: Pixel Space Pinball — FIXED + MOBILE
+  - Keyboard: Z (left) and / (right) still works
+  - Mobile: two on-screen flipper buttons (hold supported)
+  - Prevents sticky keys + cleans listeners on exit
+************************/
+function trialPinball(root) {
+  $("gameTitle").innerText = "🛸 Trial: Pixel Space Pinball";
+
+  root.innerHTML = `
+    <div class="game-frame">
+      <div class="row">
+        <div>Flip: <span class="kbd">Z</span>/<span class="kbd">/</span> • Target: <strong>900</strong></div>
+        <div>Score: <strong id="pbScore">0</strong></div>
+      </div>
+
+      <canvas class="canvas" id="pbCanvas" width="720" height="360"></canvas>
+      <div class="center small" style="margin-top:10px;" id="pbMsg"></div>
+
+      <!-- Mobile controls -->
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn" id="pbLeft" type="button" style="min-width:140px;">⬅️ Left Flip</button>
+        <button class="btn" id="pbRight" type="button" style="min-width:140px;">Right Flip ➡️</button>
+      </div>
+
+      <div class="center" style="margin-top:10px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button class="btn ghost" id="pbLeave" type="button">Leave</button>
+      </div>
+    </div>
+  `;
+
+  const canvas = $("pbCanvas");
+  const ctx = canvas?.getContext?.("2d");
+  const msg = $("pbMsg");
+  const scoreEl = $("pbScore");
+  const leaveBtn = $("pbLeave");
+  const leftBtn = $("pbLeft");
+  const rightBtn = $("pbRight");
+
+  if (!canvas || !ctx || !msg || !scoreEl || !leaveBtn || !leftBtn || !rightBtn) {
+    root.innerHTML = `<div class="game-frame">Pinball trial UI is missing required elements.</div>`;
+    isTrialRunning = false;
+    isMiniGameRunning = false;
+    return;
+  }
+
+  ctx.imageSmoothingEnabled = false;
+
+  let running = true;
+  let score = 0;
+  const target = 900;
+
+  // ball physics
+  const ball = { x: 360, y: 80, vx: 120, vy: 0, r: 6 };
+
+  // bounds
+  const bounds = { left: 40, right: 680, top: 20, bottom: 340 };
+
+  const bumpers = [
+    { x: 220, y: 120, r: 16, pts: 90, emoji: "⭐" },
+    { x: 500, y: 120, r: 16, pts: 90, emoji: "⭐" },
+    { x: 360, y: 170, r: 18, pts: 120, emoji: "🌟" }
+  ];
+
+  const alienDog = { img: new Image(), x: 360, y: 250, r: 18, t: 0, pts: 160 };
+  alienDog.img.src = `assets/characters/aliendog.png?v=${typeof SPRITE_VERSION !== "undefined" ? SPRITE_VERSION : "v1"}`;
+
+  const leftPad = { x: 250, y: 310, w: 80, h: 10, up: false };
+  const rightPad = { x: 390, y: 310, w: 80, h: 10, up: false };
+
+  // inputs
+  const keys = { z: false, slash: false };
+
+  // prevent mobile ghost clicks after pointer events
+  let buttonGuardUntil = 0;
+
+  function addScore(n) {
+    score += n;
+    scoreEl.innerText = String(score);
+  }
+
+  function clampBall() {
+    if (ball.x - ball.r < bounds.left) { ball.x = bounds.left + ball.r; ball.vx *= -1; }
+    if (ball.x + ball.r > bounds.right) { ball.x = bounds.right - ball.r; ball.vx *= -1; }
+    if (ball.y - ball.r < bounds.top) { ball.y = bounds.top + ball.r; ball.vy *= -1; }
+    if (ball.y + ball.r > bounds.bottom) { ball.y = bounds.bottom - ball.r; ball.vy *= -0.7; }
+  }
+
+  function hitCircle(cx, cy, cr) {
+    const dx = ball.x - cx;
+    const dy = ball.y - cy;
+    return Math.sqrt(dx * dx + dy * dy) <= (cr + ball.r);
+  }
+
+  function bounceFromCircle(cx, cy, push = 18) {
+    const dx = ball.x - cx;
+    const dy = ball.y - cy;
+    const d = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
+    const nx = dx / d;
+    const ny = dy / d;
+
+    ball.x = cx + nx * (ball.r + push);
+    ball.y = cy + ny * (ball.r + push);
+
+    const dot = ball.vx * nx + ball.vy * ny;
+    ball.vx = ball.vx - 2 * dot * nx;
+    ball.vy = ball.vy - 2 * dot * ny;
+
+    ball.vx *= 1.02;
+    ball.vy *= 1.02;
+  }
+
+  function hitRect(r) {
+    return (
+      ball.x + ball.r > r.x &&
+      ball.x - ball.r < r.x + r.w &&
+      ball.y + ball.r > r.y &&
+      ball.y - ball.r < r.y + r.h
+    );
+  }
+
+  function bounceFromPaddle(p) {
+    ball.y = p.y - ball.r - 1;
+    ball.vy = -Math.abs(ball.vy) - (p.up ? 260 : 180);
+    const center = p.x + p.w / 2;
+    const dx = (ball.x - center) / (p.w / 2);
+    ball.vx += dx * 120;
+  }
+
+  function drawBG() {
+    ctx.fillStyle = "rgba(20, 14, 36, 0.95)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 97) % canvas.width;
+      const y = (i * 53) % canvas.height;
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(x, y, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+
+    ctx.strokeStyle = "rgba(255,77,136,.55)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top);
+  }
+
+  function drawBumpers() {
+    bumpers.forEach((b) => {
+      ctx.font = "18px ui-monospace, system-ui";
+      ctx.fillText(b.emoji, b.x - 8, b.y + 8);
+      ctx.strokeStyle = "rgba(255,255,255,.18)";
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+  }
+
+  function drawAlienDog() {
+    const w = 36, h = 36;
+    if (alienDog.img.complete && alienDog.img.naturalWidth > 0) {
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(alienDog.img, alienDog.x - w / 2, alienDog.y - h / 2, w, h);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.font = "18px ui-monospace, system-ui";
+      ctx.fillText("👽🐶", alienDog.x - 14, alienDog.y + 6);
+    }
+  }
+
+  function drawPaddles() {
+    ctx.fillStyle = "rgba(255,77,136,.9)";
+    ctx.fillRect(leftPad.x, leftPad.y, leftPad.w, leftPad.h);
+    ctx.fillRect(rightPad.x, rightPad.y, rightPad.w, rightPad.h);
+  }
+
+  function drawBall() {
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+    ctx.fillRect(Math.round(ball.x - ball.r), Math.round(ball.y - ball.r), ball.r * 2, ball.r * 2);
+  }
+
+  // combo
+  let comboCount = 0;
+  let comboUntil = 0;
+
+  let last = performance.now();
+  function loop(now) {
+    if (!running) return;
+    const dt = (now - last) / 1000;
+    last = now;
+
+    const gravity = 620;
+    ball.vy += gravity * dt;
+
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // float alien dog
+    alienDog.t += dt;
+    alienDog.x = 360 + Math.sin(alienDog.t * 1.3) * 120;
+    alienDog.y = 250 + Math.cos(alienDog.t * 1.1) * 20;
+
+    clampBall();
+
+    // bumpers
+    for (const b of bumpers) {
+      if (hitCircle(b.x, b.y, b.r)) {
+        bounceFromCircle(b.x, b.y, b.r);
+        addScore(b.pts);
+
+        const nowMs = Date.now();
+        if (nowMs > comboUntil) {
+          comboCount = 0;
+          comboUntil = nowMs + 2500;
+        }
+        comboCount += 1;
+
+        if (comboCount >= 3) {
+          addScore(250);
+          comboCount = 0;
+          comboUntil = 0;
+          msg.innerText = "COMBO! ✨ +250";
+        } else {
+          msg.innerText = `Star hit! (+${b.pts})`;
+        }
+      }
+    }
+
+    // alien dog bumper
+    if (hitCircle(alienDog.x, alienDog.y, alienDog.r)) {
+      bounceFromCircle(alienDog.x, alienDog.y, alienDog.r);
+      addScore(alienDog.pts);
+      msg.innerText = `Alien dog boost! (+${alienDog.pts}) 👽🐶`;
+    }
+
+    // paddles (keys drive up/down)
+    leftPad.up = keys.z;
+    rightPad.up = keys.slash;
+
+    leftPad.y = leftPad.up ? 304 : 310;
+    rightPad.y = rightPad.up ? 304 : 310;
+
+    if (hitRect(leftPad) && ball.vy > 0) bounceFromPaddle(leftPad);
+    if (hitRect(rightPad) && ball.vy > 0) bounceFromPaddle(rightPad);
+
+    // drain
+    if (ball.y > bounds.bottom + 20) {
+      end(false);
+      return;
+    }
+
+    // win
+    if (score >= target) {
+      end(true);
+      return;
+    }
+
+    drawBG();
+    drawBumpers();
+    drawAlienDog();
+    drawPaddles();
+    drawBall();
+
+    requestAnimationFrame(loop);
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "z" || e.key === "Z") keys.z = true;
+    if (e.key === "/") keys.slash = true;
+  }
+  function onKeyUp(e) {
+    if (e.key === "z" || e.key === "Z") keys.z = false;
+    if (e.key === "/") keys.slash = false;
+  }
+
+  // Mobile flippers: pointerdown to hold, pointerup to release
+  function setLeft(on) { keys.z = !!on; }
+  function setRight(on) { keys.slash = !!on; }
+
+  function onLeftDown(e) {
+    e.preventDefault?.();
+    const now = Date.now();
+    if (now < buttonGuardUntil) return;
+    buttonGuardUntil = now + 250;
+    touchAction?.();
+    setLeft(true);
+  }
+  function onLeftUp(e) {
+    e.preventDefault?.();
+    setLeft(false);
+  }
+
+  function onRightDown(e) {
+    e.preventDefault?.();
+    const now = Date.now();
+    if (now < buttonGuardUntil) return;
+    buttonGuardUntil = now + 250;
+    touchAction?.();
+    setRight(true);
+  }
+  function onRightUp(e) {
+    e.preventDefault?.();
+    setRight(false);
+  }
+
+  function end(passed) {
+    running = false;
+
+    msg.innerText = passed
+      ? "You cleared the pinball trial 💗"
+      : "Ball drained… try again later 🥺";
+
+    leaveBtn.className = "btn";
+    leaveBtn.innerText = passed ? "Continue" : "Back to Mini Games";
+    leaveBtn.onclick = () => {
+      touchAction?.();
+      finishStageTrial?.(3, passed);
+      showView?.("minigames");
+      cleanup();
+    };
+
+    cleanup();
+  }
+
+  function onLeaveClick() {
+    touchAction?.();
+    finishStageTrial?.(3, false);
+    showView?.("minigames");
+    cleanup();
+  }
+
+  function cleanup() {
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("keyup", onKeyUp);
+
+    leftBtn.removeEventListener("pointerdown", onLeftDown);
+    leftBtn.removeEventListener("pointerup", onLeftUp);
+    leftBtn.removeEventListener("pointercancel", onLeftUp);
+    leftBtn.removeEventListener("pointerleave", onLeftUp);
+
+    rightBtn.removeEventListener("pointerdown", onRightDown);
+    rightBtn.removeEventListener("pointerup", onRightUp);
+    rightBtn.removeEventListener("pointercancel", onRightUp);
+    rightBtn.removeEventListener("pointerleave", onRightUp);
+
+    leaveBtn.removeEventListener("click", onLeaveClick);
+
+    // ensure no sticky inputs
+    keys.z = false;
+    keys.slash = false;
+
+    stopCurrentGame = () => {};
+    isTrialRunning = false;
+    isMiniGameRunning = false;
+  }
+
+  // bind
+  window.addEventListener("keydown", onKeyDown);
+  window.addEventListener("keyup", onKeyUp);
+
+  leftBtn.style.touchAction = "none";
+  rightBtn.style.touchAction = "none";
+  leftBtn.addEventListener("pointerdown", onLeftDown, { passive: false });
+  leftBtn.addEventListener("pointerup", onLeftUp, { passive: false });
+  leftBtn.addEventListener("pointercancel", onLeftUp, { passive: false });
+  leftBtn.addEventListener("pointerleave", onLeftUp, { passive: false });
+
+  rightBtn.addEventListener("pointerdown", onRightDown, { passive: false });
+  rightBtn.addEventListener("pointerup", onRightUp, { passive: false });
+  rightBtn.addEventListener("pointercancel", onRightUp, { passive: false });
+  rightBtn.addEventListener("pointerleave", onRightUp, { passive: false });
+
+  leaveBtn.addEventListener("click", onLeaveClick);
+
+  stopCurrentGame = () => {
+    running = false;
+    cleanup();
+  };
+
+  msg.innerText = "Hit bumpers, avoid draining. Target: 900";
+  requestAnimationFrame(loop);
+}
+
+
+/***********************
   TRIAL 4: Minyoung Party (cute graphics, competitive mean)
   - Click GOOD items to earn points
   - Avoid BAD items (they subtract points + make her mad)
@@ -3859,6 +4439,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
