@@ -2575,6 +2575,7 @@ function gameMinesweeper(root) {
 
   const wrap = root.querySelector("#minesWrap");
   const boardEl = root.querySelector("#board");
+  boardEl.classList.add("ms-board");
   const minesCountEl = root.querySelector("#mines-count");
   const flagBtn = root.querySelector("#flag-button");
   const restartBtn = root.querySelector("#ms-restart");
@@ -3728,6 +3729,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
