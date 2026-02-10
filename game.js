@@ -1123,6 +1123,78 @@ $("affection").innerText =
   ✅ Includes renderShop + buyItem
   ✅ Re-attaches shop nav buttons
 ************************/
+/***********************
+  SHOP (Flavor-Rich + Backward Compatible)
+  - Preserves your original writing
+  - Adds extra details & auto-fills for newer items
+  - Unique ownership checks by id OR name (old saves safe)
+  - Event delegation for buy buttons
+************************/
+
+// Optional: if you don't already have these helpers elsewhere
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function ensureArray(v) {
+  return Array.isArray(v) ? v : [];
+}
+
+function ownsItem(item) {
+  const inv = ensureArray(state?.inventory);
+  const invIds = ensureArray(state?.inventoryIds);
+  // Backward compatible: old code stored item.name in inventory
+  return invIds.includes(item.id) || inv.includes(item.name);
+}
+
+function addOwned(item) {
+  state.inventory = ensureArray(state.inventory);
+  state.inventoryIds = ensureArray(state.inventoryIds);
+
+  // Keep old behavior (names) AND add ids so future checks are reliable
+  if (!state.inventory.includes(item.name)) state.inventory.push(item.name);
+  if (!state.inventoryIds.includes(item.id)) state.inventoryIds.push(item.id);
+}
+
+function normalizeShopItem(item) {
+  // This keeps your existing items exactly as-is, but prevents “boring empty” cards
+  // if a newer item forgot to include some fields.
+  const out = { ...item };
+
+  // Required-ish
+  out.id = String(out.id || "").trim();
+  out.name = out.name ?? "✨ Mystery Gift";
+  out.cost = Number.isFinite(out.cost) ? out.cost : 10;
+
+  // Flavor fields
+  out.type = out.type ?? "Gift";
+  out.desc =
+    out.desc ??
+    "A small, specific kindness that somehow changes the whole mood of the day.";
+  out.flavor =
+    out.flavor ??
+    `"He didn’t have to do that… but he did."`;
+
+  // Extra details layer (new, but optional)
+  out.rarity = out.rarity ?? (out.unique ? "Legendary" : "Common");
+  out.tags = Array.isArray(out.tags) ? out.tags : [];
+  out.note = out.note ?? ""; // tiny extra line if you want
+
+  // Defaults for gameplay fields
+  out.affectionHidden = Number.isFinite(out.affectionHidden) ? out.affectionHidden : 0;
+  out.unique = !!out.unique;
+
+  return out;
+}
+
+/***********************
+  SHOP ITEMS (your originals preserved)
+************************/
 const SHOP_ITEMS = [
   // A
   {
@@ -1133,6 +1205,8 @@ const SHOP_ITEMS = [
     type: "Grand Gesture",
     desc: `A fully planned evening. Reservation secured. No decisions required from you.`,
     flavor: `"Tonight, just exist beautifully."`,
+    rarity: "Rare",
+    tags: ["date", "planning", "no-decisions"],
     unique: false,
     onBuy() {
       if (Math.random() < 0.4) state.affection += 10;
@@ -1147,6 +1221,8 @@ const SHOP_ITEMS = [
     type: "Physical Relief",
     desc: `One precise stretch and suddenly the world realigns.`,
     flavor: `"Wait… do that again."`,
+    rarity: "Common",
+    tags: ["relief", "care"],
     unique: false
   },
   // C
@@ -1158,6 +1234,8 @@ const SHOP_ITEMS = [
     type: "Couple Move",
     desc: `A warm cup placed gently next to you before you fully wake up.`,
     flavor: `"You don’t have to open your eyes yet."`,
+    rarity: "Common",
+    tags: ["morning", "routine"],
     unique: false
   },
   {
@@ -1168,6 +1246,8 @@ const SHOP_ITEMS = [
     type: "Verbal Buff",
     desc: `Specific. Observant. Slightly disarming praise that lingers all day.`,
     flavor: `"Have I told you how unfairly pretty you are?"`,
+    rarity: "Common",
+    tags: ["words", "confidence"],
     unique: false
   },
   {
@@ -1178,6 +1258,8 @@ const SHOP_ITEMS = [
     type: "Cozy",
     desc: `No phones. No scrolling. Just leaning into each other.`,
     flavor: `"Nothing happened. And it was perfect."`,
+    rarity: "Common",
+    tags: ["cozy", "quiet"],
     unique: false
   },
   // D
@@ -1189,6 +1271,8 @@ const SHOP_ITEMS = [
     type: "Couple Move",
     desc: `Shows up with your favorite takeout after a long day without being asked.`,
     flavor: `"You looked tired. So I handled dinner."`,
+    rarity: "Uncommon",
+    tags: ["food", "support"],
     unique: false,
     onBuy() {
       if (Math.random() < 0.35) state.affection += 5;
@@ -1203,6 +1287,8 @@ const SHOP_ITEMS = [
     type: "Luxury Care",
     desc: `Slow, careful movements that melt tension you didn’t know you were holding.`,
     flavor: `"Relax your jaw… I’ve got you."`,
+    rarity: "Uncommon",
+    tags: ["care", "calm"],
     unique: false
   },
   {
@@ -1213,6 +1299,8 @@ const SHOP_ITEMS = [
     type: "Cozy Item",
     desc: `A gentle hand rests across your forehead, shielding your eyes from the world.`,
     flavor: `"Rest. I’ve got the watch."`,
+    rarity: "Legendary",
+    tags: ["safe", "sleep", "aura"],
     unique: true,
     onBuy() {
       state.flags.safeSleepy = true;
@@ -1226,6 +1314,8 @@ const SHOP_ITEMS = [
     type: "Security",
     desc: `Gentle. Unrushed. Usually when you least expect it.`,
     flavor: `"Right here is my favorite place."`,
+    rarity: "Uncommon",
+    tags: ["security", "soft"],
     unique: false
   },
   {
@@ -1236,6 +1326,8 @@ const SHOP_ITEMS = [
     type: "Care",
     desc: `Was it necessary? No. Did he do it anyway? Yes.`,
     flavor: `"Eat. I know you forget."`,
+    rarity: "Common",
+    tags: ["food", "care"],
     unique: false,
     onBuy() {
       if (Math.random() < 0.5) state.affection += 4;
@@ -1250,6 +1342,8 @@ const SHOP_ITEMS = [
     type: "Partner Skill Upgrade",
     desc: `A fully committed comedy performance.`,
     flavor: `"I’m not embarrassed. I’m in love."`,
+    rarity: "Rare",
+    tags: ["funny", "buff"],
     unique: true,
     onBuy() {
       state.buffGoofyNate = Math.max(state.buffGoofyNate, 10);
@@ -1265,6 +1359,8 @@ const SHOP_ITEMS = [
     type: "Micro Care",
     desc: `No searching. No adjustments. Just instant relief.`,
     flavor: `"How did you find it that fast??"`,
+    rarity: "Common",
+    tags: ["micro-care", "relief"],
     unique: false
   },
   // J
@@ -1276,6 +1372,8 @@ const SHOP_ITEMS = [
     type: "Food Date",
     desc: `Spicy, sizzling octopus shared across the table while you both pretend it’s not that spicy.`,
     flavor: `"Okay but why is it SO good?"`,
+    rarity: "Uncommon",
+    tags: ["date", "spicy", "food"],
     unique: false
   },
   // K
@@ -1287,10 +1385,12 @@ const SHOP_ITEMS = [
     type: "Korean Food Buff",
     desc: `Warm rice, soup, endless side dishes, and the feeling of home.`,
     flavor: `“Korean food always makes her feel better.”`,
+    rarity: "Rare",
+    tags: ["home", "buff", "food"],
     unique: false,
     onBuy() {
       state.buffKoreanFeast = Math.max(state.buffKoreanFeast, 6);
-      setMood("happy", { persist: true });
+      setMood?.("happy", { persist: true });
     }
   },
   // L
@@ -1302,6 +1402,8 @@ const SHOP_ITEMS = [
     type: "Trust",
     desc: `The final cookie. Untouched.`,
     flavor: `"I was tempted. Be proud."`,
+    rarity: "Common",
+    tags: ["trust", "sweet"],
     unique: false
   },
   {
@@ -1312,6 +1414,8 @@ const SHOP_ITEMS = [
     type: "Weirdly Cute",
     desc: `A quick cozy inhale followed by a satisfied nod.`,
     flavor: `"Yep. You smell like home."`,
+    rarity: "Common",
+    tags: ["cute", "home"],
     unique: false
   },
   // P
@@ -1323,6 +1427,8 @@ const SHOP_ITEMS = [
     type: "Soul Item",
     desc: `A scent that lingers emotionally.`,
     flavor: `"Some loves don’t fade."`,
+    rarity: "Legendary",
+    tags: ["memory", "aura"],
     unique: true,
     onBuy() {
       state.flags.perfume = true;
@@ -1337,6 +1443,8 @@ const SHOP_ITEMS = [
     type: "Seasonal Treasure",
     desc: `Honey-sweet nostalgia.`,
     flavor: `"Sweetness arrives intensely."`,
+    rarity: "Uncommon",
+    tags: ["seasonal", "soft"],
     unique: false
   },
   {
@@ -1347,6 +1455,8 @@ const SHOP_ITEMS = [
     type: "Memory",
     desc: `Captured before you could protest.`,
     flavor: `"I want to remember this version of you."`,
+    rarity: "Uncommon",
+    tags: ["memory", "photo"],
     unique: false
   },
   // S
@@ -1358,6 +1468,8 @@ const SHOP_ITEMS = [
     type: "Thoughtful",
     desc: `Proof you live in his brain.`,
     flavor: `"It had your energy."`,
+    rarity: "Common",
+    tags: ["thoughtful", "tiny"],
     unique: false,
     onBuy() {
       state.affection += Math.floor(Math.random() * 9);
@@ -1371,6 +1483,8 @@ const SHOP_ITEMS = [
     type: "Protection Aura",
     desc: `Handles the morning so you don’t have to.`,
     flavor: `"Don’t wake up yet. I’ll manage everything."`,
+    rarity: "Uncommon",
+    tags: ["sleep", "protection"],
     unique: false
   },
   {
@@ -1381,6 +1495,8 @@ const SHOP_ITEMS = [
     type: "Playful Romance",
     desc: `Cold noses, laughter, and matching snow wings.`,
     flavor: `"Stay still — I want to remember this."`,
+    rarity: "Common",
+    tags: ["playful", "winter"],
     unique: false
   },
   {
@@ -1391,6 +1507,8 @@ const SHOP_ITEMS = [
     type: "Snack Buff",
     desc: `Chewy, savory, unstoppable.`,
     flavor: `"Just one more bite…"`,
+    rarity: "Uncommon",
+    tags: ["snack", "buff"],
     unique: false
   },
   // T
@@ -1402,6 +1520,8 @@ const SHOP_ITEMS = [
     type: "Companion Relic",
     desc: `Instant mood restoration.`,
     flavor: `"Joy is loud and neon."`,
+    rarity: "Legendary",
+    tags: ["companion", "relic"],
     unique: true,
     onBuy() {
       state.flags.tennisBall = true;
@@ -1415,10 +1535,12 @@ const SHOP_ITEMS = [
     type: "Ultra Intimacy",
     desc: `A long, unhurried hold where the outside world briefly stops existing.`,
     flavor: `"Right here. Don’t go anywhere."`,
+    rarity: "Rare",
+    tags: ["intimacy", "calm"],
     unique: false,
     onBuy() {
       if (Math.random() < 0.35) {
-        setMood("happy", { persist: true });
+        setMood?.("happy", { persist: true });
         state.affection += 15;
       }
     }
@@ -1431,63 +1553,137 @@ const SHOP_ITEMS = [
     type: "Chaos Entertainment",
     desc: `Front-row to pure golden retriever physics.`,
     flavor: `“He’s rebranding the atmosphere.”`,
+    rarity: "Rare",
+    tags: ["chaos", "buff"],
     unique: true,
     onBuy() {
       state.buffTornadoFudge = Math.max(state.buffTornadoFudge, 8);
       state.flags.tornadoFudge = true;
     }
-  }
-];
+  },
 
+  // NEW ITEMS (with full details so they aren’t boring)
+  {
+    id: "warmSocks",
+    name: `🧦 Warm Socks Delivered Like a Sacred Offering`,
+    cost: 14,
+    affectionHidden: 36,
+    type: "Cozy Care",
+    desc: `He appears. He kneels. He slides warm socks onto your feet like it’s a ritual.`,
+    flavor: `"Your toes looked sad. I fixed it."`,
+    rarity: "Common",
+    tags: ["cozy", "winter", "care"],
+    unique: false
+  },
+  {
+    id: "laundryFold",
+    name: `🧺 Laundry Folded Into Perfect Little Squares`,
+    cost: 26,
+    affectionHidden: 60,
+    type: "Acts of Service",
+    desc: `Not just folded. Curated. Each stack quietly screaming “I love you.”`,
+    flavor: `"Go rest. I’ll handle the boring parts."`,
+    rarity: "Uncommon",
+    tags: ["service", "relief"],
+    unique: false,
+    onBuy() {
+      if (Math.random() < 0.25) state.affection += 8;
+    }
+  },
+  {
+    id: "headPatPermit",
+    name: `🪪 Official Head-Pat Permit`,
+    cost: 9,
+    affectionHidden: 28,
+    type: "Cute Authority",
+    desc: `A tiny imaginary license that grants unlimited gentle head pats on demand.`,
+    flavor: `"Permit approved. Come here."`,
+    rarity: "Common",
+    tags: ["cute", "touch"],
+    unique: false
+  }
+].map(normalizeShopItem);
+
+/***********************
+  Shop rendering (flavor restored + richer details)
+************************/
 function renderShop() {
   const root = $("shopList");
   if (!root) return;
 
   root.innerHTML = "";
 
-  SHOP_ITEMS.forEach((item) => {
-    const ownedUnique = item.unique && state.inventory.includes(item.name);
+  // Optional: stable sorting (by name emoji vibe can be chaotic, so keep original order)
+  for (const raw of SHOP_ITEMS) {
+    const item = normalizeShopItem(raw);
+    const ownedUnique = item.unique && ownsItem(item);
 
     const el = document.createElement("div");
     el.className = "shop-item";
+
+    // Nice little badge row
+    const badges = [
+      item.unique ? "Unique" : null,
+      item.rarity ? item.rarity : null,
+      item.tags?.length ? item.tags.slice(0, 3).join(" • ") : null
+    ].filter(Boolean);
+
     el.innerHTML = `
       <div class="shop-top">
-        <div>
-          <div class="shop-name">${item.name}</div>
+        <div style="min-width:0;">
+          <div class="shop-name">${escapeHtml(item.name)}</div>
+
           <div class="shop-meta">
-            <div><strong>Type:</strong> ${item.type}</div>
-            <div class="small" style="margin-top:6px; white-space:pre-line;">${item.desc}</div>
-            <div class="small" style="margin-top:6px;"><em>${item.flavor}</em></div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:4px;">
+              <div><strong>Type:</strong> ${escapeHtml(item.type)}</div>
+              ${badges.length ? `<div class="small" style="opacity:.8;">${escapeHtml(badges.join("  ·  "))}</div>` : ``}
+            </div>
+
+            <div class="small" style="margin-top:8px; white-space:pre-line;">
+              ${escapeHtml(item.desc)}
+            </div>
+
+            <div class="small" style="margin-top:8px;">
+              <em>${escapeHtml(item.flavor)}</em>
+            </div>
+
+            ${item.note ? `<div class="small" style="margin-top:8px; opacity:.75;">${escapeHtml(item.note)}</div>` : ``}
           </div>
         </div>
+
         <div class="shop-actions">
           <div class="cost">Cost: 💗 ${item.cost}</div>
-          <button class="btn ${ownedUnique ? "ghost" : ""}" ${ownedUnique ? "disabled" : ""} data-buy="${item.id}">
+          <button class="btn ${ownedUnique ? "ghost" : ""}" ${ownedUnique ? "disabled" : ""} data-buy="${escapeHtml(item.id)}">
             ${ownedUnique ? "Owned" : "Buy"}
           </button>
         </div>
       </div>
     `;
-    root.appendChild(el);
-  });
 
-  root.querySelectorAll("[data-buy]").forEach((btn) => {
-    btn.addEventListener("click", () => buyItem(btn.getAttribute("data-buy")));
-  });
+    root.appendChild(el);
+  }
+
+  // Event delegation (clean + avoids stacking listeners if renderShop called often)
+  root.onclick = (e) => {
+    const btn = e.target?.closest?.("[data-buy]");
+    if (!btn) return;
+    const id = btn.getAttribute("data-buy");
+    buyItem(id);
+  };
 }
 
 function buyItem(id) {
-  touchAction();
+  touchAction?.();
 
-  const item = SHOP_ITEMS.find((x) => x.id === id);
+  const item = SHOP_ITEMS.map(normalizeShopItem).find((x) => x.id === id);
   if (!item) return;
 
-  const ownedUnique = item.unique && state.inventory.includes(item.name);
+  const ownedUnique = item.unique && ownsItem(item);
   if (ownedUnique) return;
 
   if (!state.cheats?.unlimitedHearts) {
-    if (state.hearts < item.cost) {
-      speak("Not enough hearts 😭 Go play mini games and come back.");
+    if ((state.hearts ?? 0) < item.cost) {
+      speak?.("Not enough hearts 😭 Go play mini games and come back.");
       return;
     }
     state.hearts -= item.cost;
@@ -1495,42 +1691,43 @@ function buyItem(id) {
 
   const hidden = item.affectionHidden ?? 0;
   const boosted = Math.round(hidden * (state.affectionMult || 1));
-  state.affection += boosted;
+  state.affection = (state.affection ?? 0) + boosted;
 
-  state.inventory.push(item.name);
+  addOwned(item);
   if (typeof item.onBuy === "function") item.onBuy();
 
-  setMood("happy", { persist: true });
-  speak("Minyoung received a gift… and her mood instantly improved 💗");
+  setMood?.("happy", { persist: true });
+  speak?.("Minyoung received a gift… and her mood instantly improved 💗");
 
-  enforceCheats();
-  save();
-  recomputeStage();
-  renderHUD();
+  enforceCheats?.();
+  save?.();
+  recomputeStage?.();
+  renderHUD?.();
   renderShop();
 
-  openItemPopup(item, boosted);
-  maybePopup("afterGift");
+  openItemPopup?.(item, boosted);
+  maybePopup?.("afterGift");
 }
 
 /***********************
   NAV (restore the missing bindings)
 ************************/
 $("btnMiniGames")?.addEventListener("click", () => {
-  touchAction();
-  showView("minigames");
+  touchAction?.();
+  showView?.("minigames");
 });
 
 $("btnShop")?.addEventListener("click", () => {
-  touchAction();
+  touchAction?.();
   renderShop();
-  showView("shop");
+  showView?.("shop");
 });
 
 $("btnReset")?.addEventListener("click", () => {
   localStorage.removeItem(SAVE_KEY);
   location.reload();
 });
+
 
 
 /***********************
@@ -4454,6 +4651,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
