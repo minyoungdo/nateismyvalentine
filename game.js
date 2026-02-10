@@ -2548,10 +2548,21 @@ function gameQuiz(root) {
 }
 
 /***********************
-  Mini Game: Minesweeper (FIXED)
-  - Tiles are real <button>s (fixes “some tiles don’t click”)
-  - Uses pointerup + click safety, stops propagation
-  - Prevents flags on revealed tiles
+  Mini Game: Minesweeper (REALLY FIXED)
+  Fixes:
+  1) “Clicking one tile reveals multiple numbered tiles”
+     - That was happening because the 0-flood reveal is supposed to reveal many tiles,
+       BUT it was also re-triggering from duplicate events (pointerup + click).
+     - Now we handle ONLY ONE activation per pointer interaction and ignore duplicates.
+
+  2) Flag button “doesn’t work”
+     - Common cause: the board click handler fires twice and immediately reveals/overwrites the flag,
+       or the UI doesn’t clearly show flag-mode.
+     - Now flag mode is reliable, updates button label, and flagged tiles won’t reveal.
+
+  Notes:
+  - Uses ONE board-level event listener (event delegation) instead of per-tile listeners.
+  - Uses pointerup only, and suppresses the follow-up click via a short “click guard”.
 ************************/
 function gameMinesweeper(root) {
   touchAction();
@@ -2563,10 +2574,10 @@ function gameMinesweeper(root) {
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
           <span style="font-weight:800;">Mines:</span>
           <span id="mines-count" style="font-weight:900;">10</span>
-          <button id="flag-button" type="button" class="btn">🚩 Flag</button>
+          <button id="flag-button" type="button" class="btn" aria-pressed="false">🚩 Flag: OFF</button>
           <button id="ms-restart" type="button" class="btn">Restart</button>
         </div>
-        <div style="opacity:.7; font-size:13px;">Tip: toggle 🚩 then click tiles</div>
+        <div style="opacity:.7; font-size:13px;">Tip: turn on 🚩 then click tiles to flag</div>
       </div>
 
       <div id="board" class="ms-board" aria-label="mines board"></div>
@@ -2585,6 +2596,7 @@ function gameMinesweeper(root) {
     return;
   }
 
+  // board layout
   boardEl.style.display = "grid";
   boardEl.style.gridTemplateColumns = `repeat(8, 36px)`;
   boardEl.style.gridAutoRows = "36px";
@@ -2592,183 +2604,229 @@ function gameMinesweeper(root) {
   boardEl.style.justifyContent = "center";
   boardEl.style.alignContent = "start";
   boardEl.style.userSelect = "none";
+  boardEl.style.touchAction = "manipulation";
 
-  let board = [];
   let rows = 8;
   let columns = 8;
 
   let minesCount = 10;
-  let minesLocation = [];
+  let minesSet = new Set(); // faster
 
-  let tilesClicked = 0;
+  // Per-cell state arrays (more reliable than innerText/class checks)
+  let revealed = [];
+  let flagged = [];
+  let neighborMines = [];
+
+  let tilesRevealed = 0;
   let flagEnabled = false;
   let gameOver = false;
   let disposed = false;
 
-  let onFlagClick = null;
-  let onRestartClick = null;
+  // Guard against duplicate activation (pointerup then click)
+  let clickGuardUntil = 0;
+
+  // -------- helpers --------
+  const inBounds = (r, c) => r >= 0 && r < rows && c >= 0 && c < columns;
+
+  function idFor(r, c) {
+    return `${r}-${c}`;
+  }
+
+  function coordsFromId(id) {
+    const [rs, cs] = String(id).split("-");
+    return [parseInt(rs, 10), parseInt(cs, 10)];
+  }
+
+  function setFlagUI() {
+    flagBtn.style.opacity = flagEnabled ? "1" : "0.7";
+    flagBtn.style.transform = flagEnabled ? "scale(1.02)" : "scale(1)";
+    flagBtn.setAttribute("aria-pressed", flagEnabled ? "true" : "false");
+    flagBtn.innerText = flagEnabled ? "🚩 Flag: ON" : "🚩 Flag: OFF";
+  }
 
   function setMines() {
-    minesLocation = [];
+    minesSet = new Set();
     let minesLeft = minesCount;
 
     while (minesLeft > 0) {
-      let r = Math.floor(Math.random() * rows);
-      let c = Math.floor(Math.random() * columns);
-      let id = r.toString() + "-" + c.toString();
-
-      if (!minesLocation.includes(id)) {
-        minesLocation.push(id);
-        minesLeft -= 1;
+      const r = Math.floor(Math.random() * rows);
+      const c = Math.floor(Math.random() * columns);
+      const id = idFor(r, c);
+      if (!minesSet.has(id)) {
+        minesSet.add(id);
+        minesLeft--;
       }
     }
   }
 
-  function setFlag() {
-    if (disposed) return;
-    flagEnabled = !flagEnabled;
-    flagBtn.style.opacity = flagEnabled ? "1" : "0.7";
-    flagBtn.style.transform = flagEnabled ? "scale(1.02)" : "scale(1)";
-  }
+  function computeNeighborCounts() {
+    neighborMines = Array.from({ length: rows }, () => Array(columns).fill(0));
 
-  function revealMines() {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < columns; c++) {
-        const tile = board[r][c];
-        if (minesLocation.includes(tile.id)) {
-          tile.innerText = "💣";
-          tile.classList.add("ms-bomb");
+        let count = 0;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const rr = r + dr;
+            const cc = c + dc;
+            if (inBounds(rr, cc) && minesSet.has(idFor(rr, cc))) count++;
+          }
+        }
+        neighborMines[r][c] = count;
+      }
+    }
+  }
+
+  function tileEl(r, c) {
+    return boardEl.querySelector(`button[data-r="${r}"][data-c="${c}"]`);
+  }
+
+  function revealAllMines() {
+    for (const id of minesSet) {
+      const [r, c] = coordsFromId(id);
+      const el = tileEl(r, c);
+      if (!el) continue;
+      el.innerText = "💣";
+      el.classList.add("ms-bomb");
+    }
+  }
+
+  function markCleared() {
+    minesCountEl.innerText = "Cleared 🎉";
+    gameOver = true;
+    addRewards?.(clamp(20, 8, 60), clamp(12, 4, 35));
+    maybePopup?.("afterGame");
+    setMood?.("happy", { persist: true });
+  }
+
+  function revealCell(r, c) {
+    if (!inBounds(r, c)) return;
+    if (revealed[r][c]) return;
+    if (flagged[r][c]) return;
+
+    revealed[r][c] = true;
+    tilesRevealed++;
+
+    const el = tileEl(r, c);
+    if (!el) return;
+
+    el.classList.add("tile-clicked");
+    el.disabled = true;
+
+    const n = neighborMines[r][c];
+    if (n > 0) {
+      el.innerText = String(n);
+      el.classList.add("x" + String(n));
+    } else {
+      el.innerText = "";
+      // flood fill for zeros (this WILL reveal multiple tiles and that’s correct)
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          revealCell(r + dr, c + dc);
         }
       }
     }
   }
 
-  function checkTile(r, c) {
-    if (r < 0 || r >= rows || c < 0 || c >= columns) return 0;
-    if (minesLocation.includes(r.toString() + "-" + c.toString())) return 1;
-    return 0;
+  function toggleFlag(r, c) {
+    if (!inBounds(r, c)) return;
+    if (revealed[r][c]) return;
+    const el = tileEl(r, c);
+    if (!el) return;
+
+    flagged[r][c] = !flagged[r][c];
+    el.innerText = flagged[r][c] ? "🚩" : "";
   }
 
-  function checkMine(r, c) {
-    if (r < 0 || r >= rows || c < 0 || c >= columns) return;
-    const tile = board[r][c];
-    if (tile.classList.contains("tile-clicked")) return;
-    if (tile.innerText === "🚩") return; // don't auto-reveal flagged tiles
-
-    tile.classList.add("tile-clicked");
-    tilesClicked += 1;
-
-    let minesFound = 0;
-
-    minesFound += checkTile(r - 1, c - 1);
-    minesFound += checkTile(r - 1, c);
-    minesFound += checkTile(r - 1, c + 1);
-
-    minesFound += checkTile(r, c - 1);
-    minesFound += checkTile(r, c + 1);
-
-    minesFound += checkTile(r + 1, c - 1);
-    minesFound += checkTile(r + 1, c);
-    minesFound += checkTile(r + 1, c + 1);
-
-    if (minesFound > 0) {
-      tile.innerText = String(minesFound);
-      tile.classList.add("x" + minesFound.toString());
-      return; // IMPORTANT: stop recursion on numbered tiles
-    }
-
-    tile.innerText = "";
-
-    checkMine(r - 1, c - 1);
-    checkMine(r - 1, c);
-    checkMine(r - 1, c + 1);
-
-    checkMine(r, c - 1);
-    checkMine(r, c + 1);
-
-    checkMine(r + 1, c - 1);
-    checkMine(r + 1, c);
-    checkMine(r + 1, c + 1);
-
-    if (tilesClicked === rows * columns - minesCount) {
-      minesCountEl.innerText = "Cleared 🎉";
-      gameOver = true;
-      addRewards?.(clamp(20, 8, 60), clamp(12, 4, 35));
-      maybePopup?.("afterGame");
-      setMood?.("happy", { persist: true });
-    }
-  }
-
-  function handleTileActivate(tile) {
-    if (disposed) return;
-    if (gameOver) return;
-    if (tile.classList.contains("tile-clicked")) return;
+  function handleTileAction(r, c) {
+    if (disposed || gameOver) return;
+    if (!inBounds(r, c)) return;
 
     if (flagEnabled) {
-      // prevent flagging revealed tiles (already handled above)
-      tile.innerText = tile.innerText === "🚩" ? "" : "🚩";
+      toggleFlag(r, c);
       return;
     }
 
-    if (tile.innerText === "🚩") return; // don't click-reveal a flagged tile
+    if (flagged[r][c]) return;
 
-    if (minesLocation.includes(tile.id)) {
+    if (minesSet.has(idFor(r, c))) {
       gameOver = true;
-      revealMines();
+      revealAllMines();
       minesCountEl.innerText = "Boom 💥";
-
       addRewards?.(clamp(10, 8, 60), clamp(6, 4, 35));
       maybePopup?.("afterGame");
       if (Math.random() < 0.35) setMood?.("sad", { persist: true });
       return;
     }
 
-    const [rs, cs] = tile.id.split("-");
-    checkMine(parseInt(rs, 10), parseInt(cs, 10));
+    revealCell(r, c);
+
+    const safeTotal = rows * columns - minesCount;
+    if (tilesRevealed >= safeTotal) markCleared();
   }
 
-  function clickTile(e) {
+  // -------- event handlers --------
+  function onBoardPointerUp(e) {
     if (disposed) return;
+    const btn = e.target?.closest?.("button.ms-tile");
+    if (!btn) return;
+
     e.preventDefault?.();
     e.stopPropagation?.();
-    const tile = e.currentTarget;
-    handleTileActivate(tile);
+
+    // block the follow-up click event
+    clickGuardUntil = Date.now() + 350;
+
+    const r = parseInt(btn.getAttribute("data-r"), 10);
+    const c = parseInt(btn.getAttribute("data-c"), 10);
+    handleTileAction(r, c);
   }
 
-  function pointerUpTile(e) {
-    if (disposed) return;
-    // On some mobile setups, pointer events can be more reliable than click
+  function onBoardClick(e) {
+    // If pointerup already handled it, ignore this click.
+    if (Date.now() < clickGuardUntil) return;
+    const btn = e.target?.closest?.("button.ms-tile");
+    if (!btn) return;
+
     e.preventDefault?.();
     e.stopPropagation?.();
-    const tile = e.currentTarget;
-    handleTileActivate(tile);
+
+    const r = parseInt(btn.getAttribute("data-r"), 10);
+    const c = parseInt(btn.getAttribute("data-c"), 10);
+    handleTileAction(r, c);
+  }
+
+  function onFlagClick() {
+    if (disposed) return;
+    flagEnabled = !flagEnabled;
+    setFlagUI();
   }
 
   function buildBoard() {
-    board = [];
-    boardEl.innerHTML = "";
-    tilesClicked = 0;
+    revealed = Array.from({ length: rows }, () => Array(columns).fill(false));
+    flagged = Array.from({ length: rows }, () => Array(columns).fill(false));
+    tilesRevealed = 0;
     gameOver = false;
     flagEnabled = false;
-    minesCountEl.innerText = String(minesCount);
+    setFlagUI();
 
-    flagBtn.style.opacity = "0.7";
-    flagBtn.style.transform = "scale(1)";
+    minesCountEl.innerText = String(minesCount);
+    boardEl.innerHTML = "";
 
     setMines();
+    computeNeighborCounts();
 
     for (let r = 0; r < rows; r++) {
-      const row = [];
       for (let c = 0; c < columns; c++) {
         const tile = document.createElement("button");
         tile.type = "button";
-        tile.id = r.toString() + "-" + c.toString();
         tile.className = "ms-tile";
+        tile.setAttribute("data-r", String(r));
+        tile.setAttribute("data-c", String(c));
         tile.setAttribute("aria-label", `tile ${r + 1}, ${c + 1}`);
         tile.style.touchAction = "manipulation";
-
-        tile.addEventListener("click", clickTile);
-        tile.addEventListener("pointerup", pointerUpTile, { passive: false });
 
         tile.style.width = "36px";
         tile.style.height = "36px";
@@ -2782,37 +2840,30 @@ function gameMinesweeper(root) {
         tile.style.boxShadow = "0 10px 25px rgba(255, 100, 150, .18)";
         tile.style.cursor = "pointer";
 
-        boardEl.append(tile);
-        row.push(tile);
+        boardEl.appendChild(tile);
       }
-      board.push(row);
     }
   }
 
-  onFlagClick = () => setFlag();
-  onRestartClick = () => buildBoard();
-
+  // Attach (single) listeners
+  boardEl.addEventListener("pointerup", onBoardPointerUp, { passive: false });
+  boardEl.addEventListener("click", onBoardClick);
   flagBtn.addEventListener("click", onFlagClick);
-  restartBtn.addEventListener("click", onRestartClick);
+  restartBtn.addEventListener("click", buildBoard);
 
+  // Init
   buildBoard();
 
   stopCurrentGame = () => {
     disposed = true;
-
-    for (let r = 0; r < board.length; r++) {
-      for (let c = 0; c < board[r].length; c++) {
-        board[r][c].removeEventListener("click", clickTile);
-        board[r][c].removeEventListener("pointerup", pointerUpTile);
-      }
-    }
-
+    boardEl.removeEventListener("pointerup", onBoardPointerUp);
+    boardEl.removeEventListener("click", onBoardClick);
     flagBtn.removeEventListener("click", onFlagClick);
-    restartBtn.removeEventListener("click", onRestartClick);
-
+    restartBtn.removeEventListener("click", buildBoard);
     isMiniGameRunning = false;
   };
 }
+
 
 /***********************
   Mini Game: Hangman (FIXED)
@@ -3734,6 +3785,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
