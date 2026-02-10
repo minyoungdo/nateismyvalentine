@@ -1120,341 +1120,424 @@ $("affection").innerText =
 
 /***********************
   SHOP (hidden affection values)
+  ✅ Includes renderShop + buyItem
+  ✅ Re-attaches shop nav buttons
 ************************/
 const SHOP_ITEMS = [
-
-{
-  id: "amazingDinner",
-  name: `🍷 “I Will Take You Out for an Amazing Dinner”`,
-  cost: 55,
-  affectionHidden: 95,
-  type: "Grand Gesture",
-  desc: `A fully planned evening. Reservation secured. No decisions required from you.`,
-  flavor: `"Tonight, just exist beautifully."`,
-  unique: false,
-  onBuy() {
-    if (Math.random() < 0.4) state.affection += 10;
-  }
-},
-
-{
-  id: "backCrack",
-  name: `🦴 Expert Back Crack`,
-  cost: 18,
-  affectionHidden: 42,
-  type: "Physical Relief",
-  desc: `One precise stretch and suddenly the world realigns.`,
-  flavor: `"Wait… do that again."`,
-  unique: false
-},
-
-{
-  id: "coffee",
-  name: `☕ Morning Coffee Delivery`,
-  cost: 15,
-  affectionHidden: 30,
-  type: "Couple Move",
-  desc: `A warm cup placed gently next to you before you fully wake up.`,
-  flavor: `"You don’t have to open your eyes yet."`,
-  unique: false
-},
-
-{
-  id: "compliments",
-  name: `✨ Excessive Compliments`,
-  cost: 12,
-  affectionHidden: 38,
-  type: "Verbal Buff",
-  desc: `Specific. Observant. Slightly disarming praise that lingers all day.`,
-  flavor: `"Have I told you how unfairly pretty you are?"`,
-  unique: false
-},
-
-{
-  id: "couch",
-  name: `🛋️ Couch Cuddle`,
-  cost: 5,
-  affectionHidden: 20,
-  type: "Cozy",
-  desc: `No phones. No scrolling. Just leaning into each other.`,
-  flavor: `"Nothing happened. And it was perfect."`,
-  unique: false
-},
-
-{
-  id: "dinner",
-  name: `🥡 “I Brought You Dinner”`,
-  cost: 25,
-  affectionHidden: 40,
-  type: "Couple Move",
-  desc: `Shows up with your favorite takeout after a long day without being asked.`,
-  flavor: `"You looked tired. So I handled dinner."`,
-  unique: false,
-  onBuy() {
-    if (Math.random() < 0.35) state.affection += 5;
-  }
-},
-
-{
-  id: "faceMassage",
-  name: `🌸 Gentle Face Massage`,
-  cost: 22,
-  affectionHidden: 55,
-  type: "Luxury Care",
-  desc: `Slow, careful movements that melt tension you didn’t know you were holding.`,
-  flavor: `"Relax your jaw… I’ve got you."`,
-  unique: false
-},
-
-{
-  id: "foreheadBlanket",
-  name: `🌙 Forehead Blanket`,
-  cost: 100,
-  affectionHidden: 200,
-  type: "Cozy Item",
-  desc: `A gentle hand rests across your forehead, shielding your eyes from the world.`,
-  flavor: `"Rest. I’ve got the watch."`,
-  unique: true,
-  onBuy() {
-    state.flags.safeSleepy = true;
-  }
-},
-
-{
-  id: "foreheadKiss",
-  name: `💤 Forehead Kiss`,
-  cost: 20,
-  affectionHidden: 75,
-  type: "Security",
-  desc: `Gentle. Unrushed. Usually when you least expect it.`,
-  flavor: `"Right here is my favorite place."`,
-  unique: false
-},
-
-{
-  id: "fruit",
-  name: `🍓 Fruit Cut Into Perfect Pieces`,
-  cost: 30,
-  affectionHidden: 20,
-  type: "Care",
-  desc: `Was it necessary? No. Did he do it anyway? Yes.`,
-  flavor: `"Eat. I know you forget."`,
-  unique: false,
-  onBuy() {
-    if (Math.random() < 0.5) state.affection += 4;
-  }
-},
-
-{
-  id: "goofyNate",
-  name: `🎭 “Goofy Nate Extravaganza”`,
-  cost: 20,
-  affectionHidden: 75,
-  type: "Partner Skill Upgrade",
-  desc: `A fully committed comedy performance.`,
-  flavor: `"I’m not embarrassed. I’m in love."`,
-  unique: true,
-  onBuy() {
-    state.buffGoofyNate = Math.max(state.buffGoofyNate, 10);
-    state.flags.goofyNate = true;
-  }
-},
-
-{
-  id: "itchPerfectSpot",
-  name: `🎯 Scratch the Exact Itch Immediately`,
-  cost: 8,
-  affectionHidden: 26,
-  type: "Micro Care",
-  desc: `No searching. No adjustments. Just instant relief.`,
-  flavor: `"How did you find it that fast??"`,
-  unique: false
-},
-
-{
-  id: "jjuggumi",
-  name: `🔥 Jjuggumi Bokkeum Date`,
-  cost: 40,
-  affectionHidden: 70,
-  type: "Food Date",
-  desc: `Spicy, sizzling octopus shared across the table while you both pretend it’s not that spicy.`,
-  flavor: `"Okay but why is it SO good?"`,
-  unique: false
-},
-
-{
-  id: "koreanFeast",
-  name: `🍚 “Korean Feast”`,
-  cost: 60,
-  affectionHidden: 100,
-  type: "Korean Food Buff",
-  desc: `Warm rice, soup, endless side dishes, and the feeling of home.`,
-  flavor: `“Korean food always makes her feel better.”`,
-  unique: false,
-  onBuy() {
-    state.buffKoreanFeast = Math.max(state.buffKoreanFeast, 6);
-    setMood("happy", { persist: true });
-  }
-},
-
-{
-  id: "lastOne",
-  name: `🍪 Saved You the Last One`,
-  cost: 5,
-  affectionHidden: 5,
-  type: "Trust",
-  desc: `The final cookie. Untouched.`,
-  flavor: `"I was tempted. Be proud."`,
-  unique: false
-},
-
-{
-  id: "letMeSniffYou",
-  name: `🐶 “Let Me Sniff You”`,
-  cost: 6,
-  affectionHidden: 24,
-  type: "Weirdly Cute",
-  desc: `A quick cozy inhale followed by a satisfied nod.`,
-  flavor: `"Yep. You smell like home."`,
-  unique: false
-},
-
-{
-  id: "perfume",
-  name: `🐾 “Drake Memory” Perfume`,
-  cost: 150,
-  affectionHidden: 75,
-  type: "Soul Item",
-  desc: `A scent that lingers emotionally.`,
-  flavor: `"Some loves don’t fade."`,
-  unique: true,
-  onBuy() {
-    state.flags.perfume = true;
-    state.affectionMult = 1.1;
-  }
-},
-
-{
-  id: "persimmon",
-  name: `🌅 Perfectly Ripe Persimmon`,
-  cost: 30,
-  affectionHidden: 30,
-  type: "Seasonal Treasure",
-  desc: `Honey-sweet nostalgia.`,
-  flavor: `"Sweetness arrives intensely."`,
-  unique: false
-},
-
-{
-  id: "photo",
-  name: `📸 “You Look Cute, Don’t Move” Photo`,
-  cost: 20,
-  affectionHidden: 50,
-  type: "Memory",
-  desc: `Captured before you could protest.`,
-  flavor: `"I want to remember this version of you."`,
-  unique: false
-},
-
-{
-  id: "sawThis",
-  name: `📦 “Saw This and Thought of You”`,
-  cost: 5,
-  affectionHidden: 30,
-  type: "Thoughtful",
-  desc: `Proof you live in his brain.`,
-  flavor: `"It had your energy."`,
-  unique: false,
-  onBuy() {
-    state.affection += Math.floor(Math.random() * 9);
-  }
-},
-
-{
-  id: "sleepInMyBaby",
-  name: `🛏️ “Sleep In, My Baby”`,
-  cost: 28,
-  affectionHidden: 65,
-  type: "Protection Aura",
-  desc: `Handles the morning so you don’t have to.`,
-  flavor: `"Don’t wake up yet. I’ll manage everything."`,
-  unique: false
-},
-
-{
-  id: "snowAngel",
-  name: `❄️ Snow Angel Making`,
-  cost: 10,
-  affectionHidden: 32,
-  type: "Playful Romance",
-  desc: `Cold noses, laughter, and matching snow wings.`,
-  flavor: `"Stay still — I want to remember this."`,
-  unique: false
-},
-
-{
-  id: "squid",
-  name: `🦑 Dangerously Addictive Dried Squid`,
-  cost: 30,
-  affectionHidden: 30,
-  type: "Snack Buff",
-  desc: `Chewy, savory, unstoppable.`,
-  flavor: `"Just one more bite…"`,
-  unique: false
-},
-
-{
-  id: "tennisBall",
-  name: `🎾 Fudge’s Blessed Tennis Ball`,
-  cost: 100,
-  affectionHidden: 65,
-  type: "Companion Relic",
-  desc: `Instant mood restoration.`,
-  flavor: `"Joy is loud and neon."`,
-  unique: true,
-  onBuy() {
-    state.flags.tennisBall = true;
-  }
-},
-
-{
-  id: "tightCuddles",
-  name: `🫶 Tight Cuddles`,
-  cost: 85,
-  affectionHidden: 160,
-  type: "Ultra Intimacy",
-  desc: `A long, unhurried hold where the outside world briefly stops existing.`,
-  flavor: `"Right here. Don’t go anywhere."`,
-  unique: false,
-  onBuy() {
-    if (Math.random() < 0.35) {
+  // A
+  {
+    id: "amazingDinner",
+    name: `🍷 “I Will Take You Out for an Amazing Dinner”`,
+    cost: 55,
+    affectionHidden: 95,
+    type: "Grand Gesture",
+    desc: `A fully planned evening. Reservation secured. No decisions required from you.`,
+    flavor: `"Tonight, just exist beautifully."`,
+    unique: false,
+    onBuy() {
+      if (Math.random() < 0.4) state.affection += 10;
+    }
+  },
+  // B
+  {
+    id: "backCrack",
+    name: `🦴 Expert Back Crack`,
+    cost: 18,
+    affectionHidden: 42,
+    type: "Physical Relief",
+    desc: `One precise stretch and suddenly the world realigns.`,
+    flavor: `"Wait… do that again."`,
+    unique: false
+  },
+  // C
+  {
+    id: "coffee",
+    name: `☕ Morning Coffee Delivery`,
+    cost: 15,
+    affectionHidden: 30,
+    type: "Couple Move",
+    desc: `A warm cup placed gently next to you before you fully wake up.`,
+    flavor: `"You don’t have to open your eyes yet."`,
+    unique: false
+  },
+  {
+    id: "compliments",
+    name: `✨ Excessive Compliments`,
+    cost: 12,
+    affectionHidden: 38,
+    type: "Verbal Buff",
+    desc: `Specific. Observant. Slightly disarming praise that lingers all day.`,
+    flavor: `"Have I told you how unfairly pretty you are?"`,
+    unique: false
+  },
+  {
+    id: "couch",
+    name: `🛋️ Couch Cuddle`,
+    cost: 5,
+    affectionHidden: 20,
+    type: "Cozy",
+    desc: `No phones. No scrolling. Just leaning into each other.`,
+    flavor: `"Nothing happened. And it was perfect."`,
+    unique: false
+  },
+  // D
+  {
+    id: "dinner",
+    name: `🥡 “I Brought You Dinner”`,
+    cost: 25,
+    affectionHidden: 40,
+    type: "Couple Move",
+    desc: `Shows up with your favorite takeout after a long day without being asked.`,
+    flavor: `"You looked tired. So I handled dinner."`,
+    unique: false,
+    onBuy() {
+      if (Math.random() < 0.35) state.affection += 5;
+    }
+  },
+  // F
+  {
+    id: "faceMassage",
+    name: `🌸 Gentle Face Massage`,
+    cost: 22,
+    affectionHidden: 55,
+    type: "Luxury Care",
+    desc: `Slow, careful movements that melt tension you didn’t know you were holding.`,
+    flavor: `"Relax your jaw… I’ve got you."`,
+    unique: false
+  },
+  {
+    id: "foreheadBlanket",
+    name: `🌙 Forehead Blanket`,
+    cost: 100,
+    affectionHidden: 200,
+    type: "Cozy Item",
+    desc: `A gentle hand rests across your forehead, shielding your eyes from the world.`,
+    flavor: `"Rest. I’ve got the watch."`,
+    unique: true,
+    onBuy() {
+      state.flags.safeSleepy = true;
+    }
+  },
+  {
+    id: "foreheadKiss",
+    name: `💤 Forehead Kiss`,
+    cost: 20,
+    affectionHidden: 75,
+    type: "Security",
+    desc: `Gentle. Unrushed. Usually when you least expect it.`,
+    flavor: `"Right here is my favorite place."`,
+    unique: false
+  },
+  {
+    id: "fruit",
+    name: `🍓 Fruit Cut Into Perfect Pieces`,
+    cost: 30,
+    affectionHidden: 20,
+    type: "Care",
+    desc: `Was it necessary? No. Did he do it anyway? Yes.`,
+    flavor: `"Eat. I know you forget."`,
+    unique: false,
+    onBuy() {
+      if (Math.random() < 0.5) state.affection += 4;
+    }
+  },
+  // G
+  {
+    id: "goofyNate",
+    name: `🎭 “Goofy Nate Extravaganza”`,
+    cost: 20,
+    affectionHidden: 75,
+    type: "Partner Skill Upgrade",
+    desc: `A fully committed comedy performance.`,
+    flavor: `"I’m not embarrassed. I’m in love."`,
+    unique: true,
+    onBuy() {
+      state.buffGoofyNate = Math.max(state.buffGoofyNate, 10);
+      state.flags.goofyNate = true;
+    }
+  },
+  // I
+  {
+    id: "itchPerfectSpot",
+    name: `🎯 Scratch the Exact Itch Immediately`,
+    cost: 8,
+    affectionHidden: 26,
+    type: "Micro Care",
+    desc: `No searching. No adjustments. Just instant relief.`,
+    flavor: `"How did you find it that fast??"`,
+    unique: false
+  },
+  // J
+  {
+    id: "jjuggumi",
+    name: `🔥 Jjuggumi Bokkeum Date`,
+    cost: 40,
+    affectionHidden: 70,
+    type: "Food Date",
+    desc: `Spicy, sizzling octopus shared across the table while you both pretend it’s not that spicy.`,
+    flavor: `"Okay but why is it SO good?"`,
+    unique: false
+  },
+  // K
+  {
+    id: "koreanFeast",
+    name: `🍚 “Korean Feast”`,
+    cost: 60,
+    affectionHidden: 100,
+    type: "Korean Food Buff",
+    desc: `Warm rice, soup, endless side dishes, and the feeling of home.`,
+    flavor: `“Korean food always makes her feel better.”`,
+    unique: false,
+    onBuy() {
+      state.buffKoreanFeast = Math.max(state.buffKoreanFeast, 6);
       setMood("happy", { persist: true });
-      state.affection += 15;
+    }
+  },
+  // L
+  {
+    id: "lastOne",
+    name: `🍪 Saved You the Last One`,
+    cost: 5,
+    affectionHidden: 5,
+    type: "Trust",
+    desc: `The final cookie. Untouched.`,
+    flavor: `"I was tempted. Be proud."`,
+    unique: false
+  },
+  {
+    id: "letMeSniffYou",
+    name: `🐶 “Let Me Sniff You”`,
+    cost: 6,
+    affectionHidden: 24,
+    type: "Weirdly Cute",
+    desc: `A quick cozy inhale followed by a satisfied nod.`,
+    flavor: `"Yep. You smell like home."`,
+    unique: false
+  },
+  // P
+  {
+    id: "perfume",
+    name: `🐾 “Drake Memory” Perfume`,
+    cost: 150,
+    affectionHidden: 75,
+    type: "Soul Item",
+    desc: `A scent that lingers emotionally.`,
+    flavor: `"Some loves don’t fade."`,
+    unique: true,
+    onBuy() {
+      state.flags.perfume = true;
+      state.affectionMult = 1.1;
+    }
+  },
+  {
+    id: "persimmon",
+    name: `🌅 Perfectly Ripe Persimmon`,
+    cost: 30,
+    affectionHidden: 30,
+    type: "Seasonal Treasure",
+    desc: `Honey-sweet nostalgia.`,
+    flavor: `"Sweetness arrives intensely."`,
+    unique: false
+  },
+  {
+    id: "photo",
+    name: `📸 “You Look Cute, Don’t Move” Photo`,
+    cost: 20,
+    affectionHidden: 50,
+    type: "Memory",
+    desc: `Captured before you could protest.`,
+    flavor: `"I want to remember this version of you."`,
+    unique: false
+  },
+  // S
+  {
+    id: "sawThis",
+    name: `📦 “Saw This and Thought of You”`,
+    cost: 5,
+    affectionHidden: 30,
+    type: "Thoughtful",
+    desc: `Proof you live in his brain.`,
+    flavor: `"It had your energy."`,
+    unique: false,
+    onBuy() {
+      state.affection += Math.floor(Math.random() * 9);
+    }
+  },
+  {
+    id: "sleepInMyBaby",
+    name: `🛏️ “Sleep In, My Baby”`,
+    cost: 28,
+    affectionHidden: 65,
+    type: "Protection Aura",
+    desc: `Handles the morning so you don’t have to.`,
+    flavor: `"Don’t wake up yet. I’ll manage everything."`,
+    unique: false
+  },
+  {
+    id: "snowAngel",
+    name: `❄️ Snow Angel Making`,
+    cost: 10,
+    affectionHidden: 32,
+    type: "Playful Romance",
+    desc: `Cold noses, laughter, and matching snow wings.`,
+    flavor: `"Stay still — I want to remember this."`,
+    unique: false
+  },
+  {
+    id: "squid",
+    name: `🦑 Dangerously Addictive Dried Squid`,
+    cost: 30,
+    affectionHidden: 30,
+    type: "Snack Buff",
+    desc: `Chewy, savory, unstoppable.`,
+    flavor: `"Just one more bite…"`,
+    unique: false
+  },
+  // T
+  {
+    id: "tennisBall",
+    name: `🎾 Fudge’s Blessed Tennis Ball`,
+    cost: 100,
+    affectionHidden: 65,
+    type: "Companion Relic",
+    desc: `Instant mood restoration.`,
+    flavor: `"Joy is loud and neon."`,
+    unique: true,
+    onBuy() {
+      state.flags.tennisBall = true;
+    }
+  },
+  {
+    id: "tightCuddles",
+    name: `🫶 Tight Cuddles`,
+    cost: 85,
+    affectionHidden: 160,
+    type: "Ultra Intimacy",
+    desc: `A long, unhurried hold where the outside world briefly stops existing.`,
+    flavor: `"Right here. Don’t go anywhere."`,
+    unique: false,
+    onBuy() {
+      if (Math.random() < 0.35) {
+        setMood("happy", { persist: true });
+        state.affection += 15;
+      }
+    }
+  },
+  {
+    id: "tornadoFudge",
+    name: `🌪️🐶 “Spinning Fudge” Tornado Dog Show Ticket`,
+    cost: 80,
+    affectionHidden: 20,
+    type: "Chaos Entertainment",
+    desc: `Front-row to pure golden retriever physics.`,
+    flavor: `“He’s rebranding the atmosphere.”`,
+    unique: true,
+    onBuy() {
+      state.buffTornadoFudge = Math.max(state.buffTornadoFudge, 8);
+      state.flags.tornadoFudge = true;
     }
   }
-},
+];
 
-{
-  id: "tornadoFudge",
-  name: `🌪️🐶 “Spinning Fudge” Tornado Dog Show Ticket`,
-  cost: 80,
-  affectionHidden: 20,
-  type: "Chaos Entertainment",
-  desc: `Front-row to pure golden retriever physics.`,
-  flavor: `“He’s rebranding the atmosphere.”`,
-  unique: true,
-  onBuy() {
-    state.buffTornadoFudge = Math.max(state.buffTornadoFudge, 8);
-    state.flags.tornadoFudge = true;
-  }
+function renderShop() {
+  const root = $("shopList");
+  if (!root) return;
+
+  root.innerHTML = "";
+
+  SHOP_ITEMS.forEach((item) => {
+    const ownedUnique = item.unique && state.inventory.includes(item.name);
+
+    const el = document.createElement("div");
+    el.className = "shop-item";
+    el.innerHTML = `
+      <div class="shop-top">
+        <div>
+          <div class="shop-name">${item.name}</div>
+          <div class="shop-meta">
+            <div><strong>Type:</strong> ${item.type}</div>
+            <div class="small" style="margin-top:6px; white-space:pre-line;">${item.desc}</div>
+            <div class="small" style="margin-top:6px;"><em>${item.flavor}</em></div>
+          </div>
+        </div>
+        <div class="shop-actions">
+          <div class="cost">Cost: 💗 ${item.cost}</div>
+          <button class="btn ${ownedUnique ? "ghost" : ""}" ${ownedUnique ? "disabled" : ""} data-buy="${item.id}">
+            ${ownedUnique ? "Owned" : "Buy"}
+          </button>
+        </div>
+      </div>
+    `;
+    root.appendChild(el);
+  });
+
+  root.querySelectorAll("[data-buy]").forEach((btn) => {
+    btn.addEventListener("click", () => buyItem(btn.getAttribute("data-buy")));
+  });
 }
 
-];
+function buyItem(id) {
+  touchAction();
+
+  const item = SHOP_ITEMS.find((x) => x.id === id);
+  if (!item) return;
+
+  const ownedUnique = item.unique && state.inventory.includes(item.name);
+  if (ownedUnique) return;
+
+  if (!state.cheats?.unlimitedHearts) {
+    if (state.hearts < item.cost) {
+      speak("Not enough hearts 😭 Go play mini games and come back.");
+      return;
+    }
+    state.hearts -= item.cost;
+  }
+
+  const hidden = item.affectionHidden ?? 0;
+  const boosted = Math.round(hidden * (state.affectionMult || 1));
+  state.affection += boosted;
+
+  state.inventory.push(item.name);
+  if (typeof item.onBuy === "function") item.onBuy();
+
+  setMood("happy", { persist: true });
+  speak("Minyoung received a gift… and her mood instantly improved 💗");
+
+  enforceCheats();
+  save();
+  recomputeStage();
+  renderHUD();
+  renderShop();
+
+  openItemPopup(item, boosted);
+  maybePopup("afterGift");
+}
+
+/***********************
+  NAV (restore the missing bindings)
+************************/
+$("btnMiniGames")?.addEventListener("click", () => {
+  touchAction();
+  showView("minigames");
+});
+
+$("btnShop")?.addEventListener("click", () => {
+  touchAction();
+  renderShop();
+  showView("shop");
+});
+
+$("btnReset")?.addEventListener("click", () => {
+  localStorage.removeItem(SAVE_KEY);
+  location.reload();
+});
+
 
 /***********************
   MINI GAMES
 ************************/
 let stopCurrentGame = null;
+let finalizeCurrentGame = null;
 
 $("btnQuitGame").addEventListener("click", () => {
   touchAction();
@@ -3776,6 +3859,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
