@@ -1503,7 +1503,7 @@ function startGame(key) {
 
   // NEW games
   if (key === "quiz") return gameQuiz(area);
-  if (key === "tetris") return gameTetris(area);
+  if (key === "minesweeper") return gameMinesweeper(area);
   if (key === "hangman") return gameHangman(area);
 }
 
@@ -2550,276 +2550,256 @@ const quizData = [
 }
 
 /***********************
-  Mini Game: Stack Yo Block (Tetris)
+  Mini Game: Minesweeper
 ************************/
-function gameTetris(root) {
-
+function gameMinesweeper(root) {
   touchAction();
-  $("gameTitle").innerText = "🎁 Stack Yo Block";
+  $("gameTitle").innerText = "💣 Minesweeper";
 
-  root.innerHTML = "";
+  // Render fresh HTML every time so replay + switching games works
+  root.innerHTML = `
+    <div id="minesWrap" class="game-frame">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <span style="font-weight:800;">Mines:</span>
+          <span id="mines-count" style="font-weight:900;">10</span>
+          <button id="flag-button" type="button" class="btn">🚩 Flag</button>
+          <button id="ms-restart" type="button" class="btn">Restart</button>
+        </div>
+        <div style="opacity:.7; font-size:13px;">Tip: toggle 🚩 then click tiles</div>
+      </div>
 
-  const wrap = document.getElementById("tetrisWrap");
+      <div id="board" class="ms-board" aria-label="mines board"></div>
+    </div>
+  `;
 
-  if (!wrap) {
-    root.innerHTML = `<div class="game-frame">Missing #tetrisWrap HTML.</div>`;
+  const wrap = root.querySelector("#minesWrap");
+  const boardEl = root.querySelector("#board");
+  const minesCountEl = root.querySelector("#mines-count");
+  const flagBtn = root.querySelector("#flag-button");
+  const restartBtn = root.querySelector("#ms-restart");
+
+  if (!wrap || !boardEl || !minesCountEl || !flagBtn || !restartBtn) {
+    root.innerHTML = `<div class="game-frame">Minesweeper HTML is incomplete.</div>`;
     isMiniGameRunning = false;
     return;
   }
 
-  wrap.classList.remove("hidden");
-  root.appendChild(wrap);
+  // --- Styles (only if you don't already have them) ---
+  // If you prefer CSS file only, move these to CSS and delete this block.
+  boardEl.style.display = "grid";
+  boardEl.style.gridTemplateColumns = `repeat(8, 36px)`;
+  boardEl.style.gridAutoRows = "36px";
+  boardEl.style.gap = "8px";
+  boardEl.style.justifyContent = "center";
+  boardEl.style.alignContent = "start";
+  boardEl.style.userSelect = "none";
 
-  const canvas = document.getElementById("tCanvas");
-  const startBtn = document.getElementById("tStartBtn");
-  const restartBtn = document.getElementById("tRestartBtn");
-  const scoreEl = document.getElementById("tScore");
-  const levelEl = document.getElementById("tLevel");
-  const linesEl = document.getElementById("tLines");
+  // Game state
+  let board = [];
+  let rows = 8;
+  let columns = 8;
 
-  canvas.innerHTML = "";
-  restartBtn.style.display = "none";
+  let minesCount = 10;
+  let minesLocation = []; // "2-2"
 
-  let running = false;
+  let tilesClicked = 0;
+  let flagEnabled = false;
+  let gameOver = false;
   let disposed = false;
 
-  const COLS = 10;
-  const ROWS = 20;
-  const SIZE = 22;
+  // Keep references to handlers so we can remove them on cleanup
+  let onFlagClick = null;
+  let onRestartClick = null;
 
-  const board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+  function setMines() {
+    minesLocation = [];
+    let minesLeft = minesCount;
 
-  const shapes = [
-    [[1,1,1,1]],
-    [[1,1],[1,1]],
-    [[0,1,0],[1,1,1]],
-    [[1,0,0],[1,1,1]],
-    [[0,0,1],[1,1,1]]
-  ];
+    while (minesLeft > 0) {
+      let r = Math.floor(Math.random() * rows);
+      let c = Math.floor(Math.random() * columns);
+      let id = r.toString() + "-" + c.toString();
 
-  let piece;
-  let pos;
-  let timer;
-  let score = 0;
-  let lines = 0;
-  let level = 1;
-
-  function drawBoard() {
-    canvas.innerHTML = "";
-
-    for (let y=0;y<ROWS;y++){
-      for (let x=0;x<COLS;x++){
-        if(board[y][x]){
-          drawSquare(x,y,"t-square");
-        }
-      }
-    }
-
-    piece.shape.forEach((row,dy)=>{
-      row.forEach((v,dx)=>{
-        if(v){
-          drawSquare(pos.x+dx,pos.y+dy,"t-square active");
-        }
-      });
-    });
-
-    scoreEl.innerText = score;
-    levelEl.innerText = level;
-    linesEl.innerText = lines;
-  }
-
-  function drawSquare(x,y,cls){
-    const d = document.createElement("div");
-    d.className = cls;
-    d.style.left = x*SIZE+"px";
-    d.style.top = y*SIZE+"px";
-    canvas.appendChild(d);
-  }
-
-  function spawn(){
-    const shape = shapes[Math.floor(Math.random()*shapes.length)];
-    piece = { shape };
-    pos = { x:3, y:0 };
-
-    if(collide()){
-      gameOver();
-    }
-  }
-
-  function collide(){
-    return piece.shape.some((row,dy)=>
-      row.some((v,dx)=>{
-        if(!v) return false;
-        const x = pos.x+dx;
-        const y = pos.y+dy;
-        return x<0 || x>=COLS || y>=ROWS || (y>=0 && board[y][x]);
-      })
-    );
-  }
-
-  function merge(){
-    piece.shape.forEach((row,dy)=>{
-      row.forEach((v,dx)=>{
-        if(v){
-          board[pos.y+dy][pos.x+dx]=1;
-        }
-      });
-    });
-  }
-
-  function clearLines(){
-    let cleared=0;
-
-    for(let y=ROWS-1;y>=0;y--){
-      if(board[y].every(v=>v)){
-        board.splice(y,1);
-        board.unshift(Array(COLS).fill(0));
-        cleared++;
-        y++;
-      }
-    }
-
-    if(cleared){
-      lines+=cleared;
-      score+=cleared*120;
-
-      if(lines>=level*6){
-        level++;
-        dropSpeed=Math.max(140,dropSpeed-60);
+      if (!minesLocation.includes(id)) {
+        minesLocation.push(id);
+        minesLeft -= 1;
       }
     }
   }
 
-  function rotate(){
-    const rotated = piece.shape[0].map((_,i)=>
-      piece.shape.map(r=>r[i]).reverse()
-    );
+  function setFlag() {
+    if (disposed) return;
 
-    const prev = piece.shape;
-    piece.shape = rotated;
+    flagEnabled = !flagEnabled;
+    flagBtn.style.opacity = flagEnabled ? "1" : "0.7";
+    flagBtn.style.transform = flagEnabled ? "scale(1.02)" : "scale(1)";
+  }
 
-    if(collide()){
-      piece.shape = prev;
+  function revealMines() {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < columns; c++) {
+        let tile = board[r][c];
+        if (minesLocation.includes(tile.id)) {
+          tile.innerText = "💣";
+          tile.classList.add("ms-bomb");
+        }
+      }
     }
   }
 
-  function move(dir){
-    pos.x+=dir;
-    if(collide()) pos.x-=dir;
+  function checkTile(r, c) {
+    if (r < 0 || r >= rows || c < 0 || c >= columns) return 0;
+    if (minesLocation.includes(r.toString() + "-" + c.toString())) return 1;
+    return 0;
   }
 
-  function drop(){
-    pos.y++;
-    if(collide()){
-      pos.y--;
-      merge();
-      clearLines();
-      spawn();
+  function checkMine(r, c) {
+    if (r < 0 || r >= rows || c < 0 || c >= columns) return;
+    if (board[r][c].classList.contains("tile-clicked")) return;
+
+    board[r][c].classList.add("tile-clicked");
+    tilesClicked += 1;
+
+    let minesFound = 0;
+
+    minesFound += checkTile(r - 1, c - 1);
+    minesFound += checkTile(r - 1, c);
+    minesFound += checkTile(r - 1, c + 1);
+
+    minesFound += checkTile(r, c - 1);
+    minesFound += checkTile(r, c + 1);
+
+    minesFound += checkTile(r + 1, c - 1);
+    minesFound += checkTile(r + 1, c);
+    minesFound += checkTile(r + 1, c + 1);
+
+    if (minesFound > 0) {
+      board[r][c].innerText = minesFound;
+      board[r][c].classList.add("x" + minesFound.toString());
+    } else {
+      board[r][c].innerText = "";
+
+      checkMine(r - 1, c - 1);
+      checkMine(r - 1, c);
+      checkMine(r - 1, c + 1);
+
+      checkMine(r, c - 1);
+      checkMine(r, c + 1);
+
+      checkMine(r + 1, c - 1);
+      checkMine(r + 1, c);
+      checkMine(r + 1, c + 1);
+    }
+
+    if (tilesClicked === rows * columns - minesCount) {
+      minesCountEl.innerText = "Cleared 🎉";
+      gameOver = true;
+      // Optional rewards hook
+      addRewards?.(clamp(20, 8, 60), clamp(12, 4, 35));
+      maybePopup?.("afterGame");
+      setMood?.("happy", { persist: true });
     }
   }
 
-  let dropSpeed = 650;
+  function clickTile(e) {
+    if (disposed) return;
 
-  function loop(){
-    if(!running || disposed) return;
+    const tile = e.currentTarget;
+    if (gameOver || tile.classList.contains("tile-clicked")) return;
 
-    drop();
-    drawBoard();
-    timer=setTimeout(loop,dropSpeed);
-  }
-
-  function start(){
-    running=true;
-    spawn();
-    loop();
-  }
-
-  function gameOver(){
-
-    running=false;
-    clearTimeout(timer);
-
-    canvas.innerHTML =
-    `<div style="
-        position:absolute;
-        inset:0;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:800;
-        background:rgba(255,255,255,.75);
-        border-radius:18px;
-     ">
-       GAME OVER<br>Score ${score}
-     </div>`;
-
-    restartBtn.style.display="inline-block";
-
-    payout();
-  }
-
-  function payout(){
-
-    const hearts = clamp(Math.floor(score/150)+8,8,60);
-    const affection = clamp(Math.floor(score/420)+4,4,30);
-
-    if(typeof addRewards==="function"){
-      addRewards(hearts,affection);
+    if (flagEnabled) {
+      tile.innerText = tile.innerText === "🚩" ? "" : "🚩";
+      return;
     }
 
-    if(score>900){
-      setMood?.("happy",{persist:true});
-    }else if(score<250 && Math.random()<.35){
-      setMood?.("sad",{persist:true});
+    if (minesLocation.includes(tile.id)) {
+      gameOver = true;
+      revealMines();
+      minesCountEl.innerText = "Boom 💥";
+
+      // Optional rewards hook (smaller)
+      addRewards?.(clamp(10, 8, 60), clamp(6, 4, 35));
+      maybePopup?.("afterGame");
+      if (Math.random() < 0.35) setMood?.("sad", { persist: true });
+      return;
     }
 
-    maybePopup?.("afterGame");
+    let coords = tile.id.split("-");
+    let r = parseInt(coords[0], 10);
+    let c = parseInt(coords[1], 10);
+    checkMine(r, c);
   }
 
-  function keyHandler(e){
-    if(!running) return;
+  function buildBoard() {
+    board = [];
+    boardEl.innerHTML = "";
+    tilesClicked = 0;
+    gameOver = false;
+    flagEnabled = false;
+    minesCountEl.innerText = String(minesCount);
 
-    if(e.key==="ArrowLeft") move(-1);
-    if(e.key==="ArrowRight") move(1);
-    if(e.key==="ArrowUp") rotate();
-    if(e.key==="ArrowDown") drop();
+    flagBtn.style.opacity = "0.7";
+    flagBtn.style.transform = "scale(1)";
 
-    drawBoard();
+    setMines();
+
+    for (let r = 0; r < rows; r++) {
+      let row = [];
+      for (let c = 0; c < columns; c++) {
+        const tile = document.createElement("div");
+        tile.id = r.toString() + "-" + c.toString();
+        tile.className = "ms-tile";
+        tile.addEventListener("click", clickTile);
+
+        // inline look (you can move to CSS)
+        tile.style.width = "36px";
+        tile.style.height = "36px";
+        tile.style.display = "flex";
+        tile.style.alignItems = "center";
+        tile.style.justifyContent = "center";
+        tile.style.fontWeight = "900";
+        tile.style.borderRadius = "12px";
+        tile.style.background = "rgba(255,255,255,.70)";
+        tile.style.boxShadow = "0 10px 25px rgba(255, 100, 150, .18)";
+        tile.style.cursor = "pointer";
+
+        boardEl.append(tile);
+        row.push(tile);
+      }
+      board.push(row);
+    }
   }
 
-  document.addEventListener("keydown",keyHandler);
+  // Attach UI handlers
+  onFlagClick = () => setFlag();
+  onRestartClick = () => buildBoard();
 
-  startBtn.onclick=()=>{
-    if(running) return;
-    restartBtn.style.display="none";
-    start();
-  };
+  flagBtn.addEventListener("click", onFlagClick);
+  restartBtn.addEventListener("click", onRestartClick);
 
-  restartBtn.onclick=()=>{
-    running=false;
-    clearTimeout(timer);
+  // Initial render
+  buildBoard();
 
-    for(let y=0;y<ROWS;y++){
-      board[y].fill(0);
+  // Cleanup when leaving the game
+  stopCurrentGame = () => {
+    disposed = true;
+
+    // remove tile listeners
+    for (let r = 0; r < board.length; r++) {
+      for (let c = 0; c < board[r].length; c++) {
+        board[r][c].removeEventListener("click", clickTile);
+      }
     }
 
-    score=0;
-    lines=0;
-    level=1;
-    dropSpeed=650;
+    // remove button listeners
+    flagBtn.removeEventListener("click", onFlagClick);
+    restartBtn.removeEventListener("click", onRestartClick);
 
-    start();
-  };
-
-  stopCurrentGame=()=>{
-    disposed=true;
-    running=false;
-    clearTimeout(timer);
-    document.removeEventListener("keydown",keyHandler);
-    wrap.classList.add("hidden");
-    isMiniGameRunning=false;
+    isMiniGameRunning = false;
   };
 }
+
 
 /***********************
   Mini Game: Hangman (UPDATED)
@@ -3748,5 +3728,6 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
