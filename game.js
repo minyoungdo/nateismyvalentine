@@ -1968,6 +1968,10 @@ function gameDino(root) {
     beep(520, 0.04, "triangle", 0.03);
     beep(740, 0.05, "sine", 0.02);
   }
+  function bonk() {
+    beep(160, 0.08, "sawtooth", 0.04);
+    beep(110, 0.10, "triangle", 0.03);
+  }
 
   let running = true;
   let last = performance.now();
@@ -2007,6 +2011,8 @@ function gameDino(root) {
   const obstacleEmojis = obstacleSetForStage(clampStage(state.stage));
 
   let finalized = false;
+
+  // If you quit, this can be called elsewhere in your app
   finalizeCurrentGame = () => {
     if (finalized) return;
     finalized = true;
@@ -2026,6 +2032,31 @@ function gameDino(root) {
 
     maybePopup("afterGame");
   };
+
+  // NEW: crash ends the run (fixes “doesn’t stop on obstacle”)
+  let ended = false;
+  function endRun(reason = "crash") {
+    if (ended) return;
+    ended = true;
+    running = false;
+    isMiniGameRunning = false;
+
+    // Rewards on crash (smaller than a clean quit)
+    const heartsEarned = clamp(Math.round(score / 18) + 6, 6, Math.min(40, MAX_HEARTS));
+    const affectionEarned = clamp(Math.round(score / 40) + 3, 3, Math.min(18, MAX_AFFECTION));
+    addRewards(heartsEarned, affectionEarned);
+
+    if (reason === "crash") {
+      $("dinoMsg").innerText = `Bonk 💥 Result: +${heartsEarned} hearts 💗`;
+      bonk();
+      if (Math.random() < 0.45) setMood("sad", { persist: true });
+    } else {
+      $("dinoMsg").innerText = `Result: +${heartsEarned} hearts 💗`;
+    }
+
+    maybePopup("afterGame");
+    cleanup();
+  }
 
   function jump() {
     if (!running) return;
@@ -2157,9 +2188,9 @@ function gameDino(root) {
     for (const o of obs) {
       const oHitbox = { x: o.x, y: o.y + 8, w: o.w + 10, h: o.h - 10 };
       if (rectsOverlap(pHitbox, oHitbox)) {
-        // instead of ending the game, just “bonk” and reset score a bit
-        score = Math.max(0, score - 60);
-        if (Math.random() < 0.45) setMood("sad", { persist: true });
+        // FIX: actually stop game on hit
+        endRun("crash");
+        return;
       }
     }
 
@@ -2183,7 +2214,8 @@ function gameDino(root) {
       jump();
     }
   }
-  function onTap() {
+  function onTap(e) {
+    e.preventDefault?.();
     jump();
   }
 
@@ -2193,7 +2225,7 @@ function gameDino(root) {
   }
 
   window.addEventListener("keydown", onKey);
-  canvas.addEventListener("pointerdown", onTap);
+  canvas.addEventListener("pointerdown", onTap, { passive: false });
 
   stopCurrentGame = () => {
     running = false;
@@ -2205,131 +2237,104 @@ function gameDino(root) {
   requestAnimationFrame(loop);
 }
 
-
 /* Game X: Minyoung Quiz (no timer, capped rewards) */
 function gameQuiz(root) {
   touchAction();
   $("gameTitle").innerText = "🧠 Minyoung Quiz";
 
   // You can edit/replace these questions anytime
-const quizData = [
-  {
-    question: "What’s my favorite movie genre?",
-    options: [
-      "Psychological thriller",
-      "Apocalypse / disaster movies",
-      "True crime documentaries",
-      "Comedy"
-    ],
-    answer: "Apocalypse / disaster movies",
-  },
-  {
-    question: "What is my height in cm?",
-    options: ["157", "158", "159", "161"],
-    answer: "158",
-  },
-  {
-    question: "What are the names of my cats?",
-    options: [
-      "Hibon & Sebon",
-      "Heebon & Saebon",
-      "Hibon & Sebon",
-      "Haebon & Saebon"
-    ],
-    answer: "Heebon & Saebon",
-  },
-  {
-    question: "In what year did I graduate high school?",
-    options: ["2010", "2011", "2012", "2013"],
-    answer: "2012",
-  },
-  {
-    question: "What is my title at work?",
-    options: [
-      "Director of Data Analytics",
-      "Director of Data and Evaluation",
-      "Head of Data and Insights",
-      "Director of Data and Research"
-    ],
-    answer: "Director of Data and Evaluation",
-  },
-  {
-    question: "Where have we NOT been on Valentine’s Day?",
-    options: ["Washington DC", "Honolulu", "Singapore", "Venice"],
-    answer: "Venice",
-  },
-  {
-    question: "What was the name of the Valentine’s retreat we took in 2019?",
-    options: ["Lake Geneva", "Clam Lake", "Cedar Lake", "Clam County"],
-    answer: "Clam Lake",
-  },
-  {
-    question: "What was the first Valentine’s Day gift I gave you?",
-    options: [
-      "Chocolate chip cookies",
-      "Dried fruit chocolate bark",
-      "Chocolate-covered strawberries",
-      "Chocolate from Paris"
-    ],
-    answer: "Dried fruit chocolate bark",
-  },
-  {
-    question: "As of 2026, what is Fudge’s vitamin brand?",
-    options: ["Zesty Paws", "Dog is Human", "Native Pet", "Pet Honesty"],
-    answer: "Dog is Human",
-  },
-  {
-    question: "What color was the first winter jacket I bought Drake in 2017?",
-    options: ["Navy", "Grey", "Forest green", "Burgundy"],
-    answer: "Grey",
-  },
-  {
-    question: "What was my favorite flavor at Pumphouse Creamery in Minneapolis?",
-    options: ["Cookies & Cream", "Cherry", "Seven Layers Bar", "Strawberry basil"],
-    answer: "Cherry",
-  },
-  {
-    question: "What is the name of the dog bath place Drake and I used to go to?",
-    options: ["Bubble Paws", "Bubbly Paws", "Bubbly Wash", "Bubbly Dogs"],
-    answer: "Bubbly Paws",
-  },
-  {
-    question: "One day, Drake rolled in ______, and I screamed and rushed him to the bath place.",
-    options: ["Goose poop", "Dead squirrel", "Mystery swamp mud", "Rotting leaves"],
-    answer: "Dead squirrel",
-  },
-  {
-    question: "What is the name of the cigarettes I used to smoke?",
-    options: ["Esse Lights", "Esse Change 1", "Marlboro Ice", "Parliament Aqua"],
-    answer: "Esse Change 1",
-  },
-  {
-    question: "I tried bell peppers for the first time in Granada after eating a bell pepper stuffed with…",
-    options: ["Chicken Thigh", "Ox tail", "Chorizo", "Seafood"],
-    answer: "Ox tail",
-  },
-  {
-    question: "What dish did I eat the MOST repeatedly in Korea last year?",
-    options: ["Dakgalbi", "Kimchi jjigae", "Galbi", "Pizza"],
-    answer: "Galbi",
-  },
-  {
-    question: "How many days did I stay in Korea in 2025?",
-    options: ["47", "52", "54", "62"],
-    answer: "54",
-  },
-  {
-    question: "Which weird thing did you not say to me?",
-    options: [
-      "“I prefer being a mega mandu.”",
-      "“I am your bacterial brother.”",
-      "“Rub your foot fungus on me.”",
-      "“Pop that oxytocin.”"
-    ],
-    answer: "“Rub your foot fungus on me.”",
-  },
-];
-
+  const quizData = [
+    {
+      question: "What’s my favorite movie genre?",
+      options: ["Psychological thriller", "Apocalypse / disaster movies", "True crime documentaries", "Comedy"],
+      answer: "Apocalypse / disaster movies",
+    },
+    {
+      question: "What is my height in cm?",
+      options: ["157", "158", "159", "161"],
+      answer: "158",
+    },
+    {
+      question: "What are the names of my cats?",
+      options: ["Hibon & Sebon", "Heebon & Saebon", "Hibon & Sebon", "Haebon & Saebon"],
+      answer: "Heebon & Saebon",
+    },
+    {
+      question: "In what year did I graduate high school?",
+      options: ["2010", "2011", "2012", "2013"],
+      answer: "2012",
+    },
+    {
+      question: "What is my title at work?",
+      options: ["Director of Data Analytics", "Director of Data and Evaluation", "Head of Data and Insights", "Director of Data and Research"],
+      answer: "Director of Data and Evaluation",
+    },
+    {
+      question: "Where have we NOT been on Valentine’s Day?",
+      options: ["Washington DC", "Honolulu", "Singapore", "Venice"],
+      answer: "Venice",
+    },
+    {
+      question: "What was the name of the Valentine’s retreat we took in 2019?",
+      options: ["Lake Geneva", "Clam Lake", "Cedar Lake", "Clam County"],
+      answer: "Clam Lake",
+    },
+    {
+      question: "What was the first Valentine’s Day gift I gave you?",
+      options: ["Chocolate chip cookies", "Dried fruit chocolate bark", "Chocolate-covered strawberries", "Chocolate from Paris"],
+      answer: "Dried fruit chocolate bark",
+    },
+    {
+      question: "As of 2026, what is Fudge’s vitamin brand?",
+      options: ["Zesty Paws", "Dog is Human", "Native Pet", "Pet Honesty"],
+      answer: "Dog is Human",
+    },
+    {
+      question: "What color was the first winter jacket I bought Drake in 2017?",
+      options: ["Navy", "Grey", "Forest green", "Burgundy"],
+      answer: "Grey",
+    },
+    {
+      question: "What was my favorite flavor at Pumphouse Creamery in Minneapolis?",
+      options: ["Cookies & Cream", "Cherry", "Seven Layers Bar", "Strawberry basil"],
+      answer: "Cherry",
+    },
+    {
+      question: "What is the name of the dog bath place Drake and I used to go to?",
+      options: ["Bubble Paws", "Bubbly Paws", "Bubbly Wash", "Bubbly Dogs"],
+      answer: "Bubbly Paws",
+    },
+    {
+      question: "One day, Drake rolled in ______, and I screamed and rushed him to the bath place.",
+      options: ["Goose poop", "Dead squirrel", "Mystery swamp mud", "Rotting leaves"],
+      answer: "Dead squirrel",
+    },
+    {
+      question: "What is the name of the cigarettes I used to smoke?",
+      options: ["Esse Lights", "Esse Change 1", "Marlboro Ice", "Parliament Aqua"],
+      answer: "Esse Change 1",
+    },
+    {
+      question: "I tried bell peppers for the first time in Granada after eating a bell pepper stuffed with…",
+      options: ["Chicken Thigh", "Ox tail", "Chorizo", "Seafood"],
+      answer: "Ox tail",
+    },
+    {
+      question: "What dish did I eat the MOST repeatedly in Korea last year?",
+      options: ["Dakgalbi", "Kimchi jjigae", "Galbi", "Pizza"],
+      answer: "Galbi",
+    },
+    {
+      question: "How many days did I stay in Korea in 2025?",
+      options: ["47", "52", "54", "62"],
+      answer: "54",
+    },
+    {
+      question: "Which weird thing did you not say to me?",
+      options: ["“I prefer being a mega mandu.”", "“I am your bacterial brother.”", "“Rub your foot fungus on me.”", "“Pop that oxytocin.”"],
+      answer: "“Rub your foot fungus on me.”",
+    },
+  ];
 
   root.innerHTML = `
     <div class="game-frame">
@@ -2450,8 +2455,6 @@ const quizData = [
 
   function displayResult() {
     finished = true;
-
-    // IMPORTANT: end mini game state
     isMiniGameRunning = false;
 
     quizContainer.style.display = "none";
@@ -2462,13 +2465,11 @@ const quizData = [
     const total = quizData.length;
     const pct = total ? score / total : 0;
 
-    // Rewards (capped)
-    // You can tune these numbers:
-    const heartsEarnedRaw = Math.round(score * 6);       // 0..114
-    const affectionEarnedRaw = Math.round(score * 2.2);  // 0..42
+    const heartsEarnedRaw = Math.round(score * 6);
+    const affectionEarnedRaw = Math.round(score * 2.2);
 
-    const MAX_HEARTS = 60;      // <- max hearts for this game
-    const MAX_AFFECTION = 28;   // <- max affection for this game
+    const MAX_HEARTS = 60;
+    const MAX_AFFECTION = 28;
 
     const heartsEarned = clamp(heartsEarnedRaw, 5, MAX_HEARTS);
     const affectionEarned = clamp(affectionEarnedRaw, 2, MAX_AFFECTION);
@@ -2476,13 +2477,12 @@ const quizData = [
     addRewards(heartsEarned, affectionEarned);
 
     resultContainer.innerHTML =
-      `You scored <strong>${score}</strong> out of <strong>${total}</strong>.<br>` +
-      `Result: +${heartsEarned} hearts 💗`;
+      `You scored <strong>${score}</strong> out of <strong>${total}</strong>.<br>` + `Result: +${heartsEarned} hearts 💗`;
 
-    if (pct >= 0.80) {
+    if (pct >= 0.8) {
       setMood("happy", { persist: true });
       speak("Minyoung: “Okay... you definitely know me. I love you!” 😳💗");
-    } else if (pct <= 0.6 && Math.random() < 0.80) {
+    } else if (pct <= 0.6 && Math.random() < 0.8) {
       setMood("sad", { persist: true });
       speak("Minyoung: “Well... I still like you... I guess.” 🥺");
     } else {
@@ -2505,9 +2505,7 @@ const quizData = [
     showAnswerButton.style.display = "none";
     resultContainer.innerHTML = "";
 
-    // Since we restarted, lock mini game again
     isMiniGameRunning = true;
-
     displayQuestion();
   }
 
@@ -2550,13 +2548,15 @@ const quizData = [
 }
 
 /***********************
-  Mini Game: Minesweeper
+  Mini Game: Minesweeper (FIXED)
+  - Tiles are real <button>s (fixes “some tiles don’t click”)
+  - Uses pointerup + click safety, stops propagation
+  - Prevents flags on revealed tiles
 ************************/
 function gameMinesweeper(root) {
   touchAction();
   $("gameTitle").innerText = "💣 Minesweeper";
 
-  // Render fresh HTML every time so replay + switching games works
   root.innerHTML = `
     <div id="minesWrap" class="game-frame">
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
@@ -2575,7 +2575,6 @@ function gameMinesweeper(root) {
 
   const wrap = root.querySelector("#minesWrap");
   const boardEl = root.querySelector("#board");
-  boardEl.classList.add("ms-board");
   const minesCountEl = root.querySelector("#mines-count");
   const flagBtn = root.querySelector("#flag-button");
   const restartBtn = root.querySelector("#ms-restart");
@@ -2586,8 +2585,6 @@ function gameMinesweeper(root) {
     return;
   }
 
-  // --- Styles (only if you don't already have them) ---
-  // If you prefer CSS file only, move these to CSS and delete this block.
   boardEl.style.display = "grid";
   boardEl.style.gridTemplateColumns = `repeat(8, 36px)`;
   boardEl.style.gridAutoRows = "36px";
@@ -2596,20 +2593,18 @@ function gameMinesweeper(root) {
   boardEl.style.alignContent = "start";
   boardEl.style.userSelect = "none";
 
-  // Game state
   let board = [];
   let rows = 8;
   let columns = 8;
 
   let minesCount = 10;
-  let minesLocation = []; // "2-2"
+  let minesLocation = [];
 
   let tilesClicked = 0;
   let flagEnabled = false;
   let gameOver = false;
   let disposed = false;
 
-  // Keep references to handlers so we can remove them on cleanup
   let onFlagClick = null;
   let onRestartClick = null;
 
@@ -2631,7 +2626,6 @@ function gameMinesweeper(root) {
 
   function setFlag() {
     if (disposed) return;
-
     flagEnabled = !flagEnabled;
     flagBtn.style.opacity = flagEnabled ? "1" : "0.7";
     flagBtn.style.transform = flagEnabled ? "scale(1.02)" : "scale(1)";
@@ -2640,7 +2634,7 @@ function gameMinesweeper(root) {
   function revealMines() {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < columns; c++) {
-        let tile = board[r][c];
+        const tile = board[r][c];
         if (minesLocation.includes(tile.id)) {
           tile.innerText = "💣";
           tile.classList.add("ms-bomb");
@@ -2657,9 +2651,11 @@ function gameMinesweeper(root) {
 
   function checkMine(r, c) {
     if (r < 0 || r >= rows || c < 0 || c >= columns) return;
-    if (board[r][c].classList.contains("tile-clicked")) return;
+    const tile = board[r][c];
+    if (tile.classList.contains("tile-clicked")) return;
+    if (tile.innerText === "🚩") return; // don't auto-reveal flagged tiles
 
-    board[r][c].classList.add("tile-clicked");
+    tile.classList.add("tile-clicked");
     tilesClicked += 1;
 
     let minesFound = 0;
@@ -2676,60 +2672,76 @@ function gameMinesweeper(root) {
     minesFound += checkTile(r + 1, c + 1);
 
     if (minesFound > 0) {
-      board[r][c].innerText = minesFound;
-      board[r][c].classList.add("x" + minesFound.toString());
-    } else {
-      board[r][c].innerText = "";
-
-      checkMine(r - 1, c - 1);
-      checkMine(r - 1, c);
-      checkMine(r - 1, c + 1);
-
-      checkMine(r, c - 1);
-      checkMine(r, c + 1);
-
-      checkMine(r + 1, c - 1);
-      checkMine(r + 1, c);
-      checkMine(r + 1, c + 1);
+      tile.innerText = String(minesFound);
+      tile.classList.add("x" + minesFound.toString());
+      return; // IMPORTANT: stop recursion on numbered tiles
     }
+
+    tile.innerText = "";
+
+    checkMine(r - 1, c - 1);
+    checkMine(r - 1, c);
+    checkMine(r - 1, c + 1);
+
+    checkMine(r, c - 1);
+    checkMine(r, c + 1);
+
+    checkMine(r + 1, c - 1);
+    checkMine(r + 1, c);
+    checkMine(r + 1, c + 1);
 
     if (tilesClicked === rows * columns - minesCount) {
       minesCountEl.innerText = "Cleared 🎉";
       gameOver = true;
-      // Optional rewards hook
       addRewards?.(clamp(20, 8, 60), clamp(12, 4, 35));
       maybePopup?.("afterGame");
       setMood?.("happy", { persist: true });
     }
   }
 
-  function clickTile(e) {
+  function handleTileActivate(tile) {
     if (disposed) return;
-
-    const tile = e.currentTarget;
-    if (gameOver || tile.classList.contains("tile-clicked")) return;
+    if (gameOver) return;
+    if (tile.classList.contains("tile-clicked")) return;
 
     if (flagEnabled) {
+      // prevent flagging revealed tiles (already handled above)
       tile.innerText = tile.innerText === "🚩" ? "" : "🚩";
       return;
     }
+
+    if (tile.innerText === "🚩") return; // don't click-reveal a flagged tile
 
     if (minesLocation.includes(tile.id)) {
       gameOver = true;
       revealMines();
       minesCountEl.innerText = "Boom 💥";
 
-      // Optional rewards hook (smaller)
       addRewards?.(clamp(10, 8, 60), clamp(6, 4, 35));
       maybePopup?.("afterGame");
       if (Math.random() < 0.35) setMood?.("sad", { persist: true });
       return;
     }
 
-    let coords = tile.id.split("-");
-    let r = parseInt(coords[0], 10);
-    let c = parseInt(coords[1], 10);
-    checkMine(r, c);
+    const [rs, cs] = tile.id.split("-");
+    checkMine(parseInt(rs, 10), parseInt(cs, 10));
+  }
+
+  function clickTile(e) {
+    if (disposed) return;
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    const tile = e.currentTarget;
+    handleTileActivate(tile);
+  }
+
+  function pointerUpTile(e) {
+    if (disposed) return;
+    // On some mobile setups, pointer events can be more reliable than click
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    const tile = e.currentTarget;
+    handleTileActivate(tile);
   }
 
   function buildBoard() {
@@ -2746,14 +2758,18 @@ function gameMinesweeper(root) {
     setMines();
 
     for (let r = 0; r < rows; r++) {
-      let row = [];
+      const row = [];
       for (let c = 0; c < columns; c++) {
-        const tile = document.createElement("div");
+        const tile = document.createElement("button");
+        tile.type = "button";
         tile.id = r.toString() + "-" + c.toString();
         tile.className = "ms-tile";
-        tile.addEventListener("click", clickTile);
+        tile.setAttribute("aria-label", `tile ${r + 1}, ${c + 1}`);
+        tile.style.touchAction = "manipulation";
 
-        // inline look (you can move to CSS)
+        tile.addEventListener("click", clickTile);
+        tile.addEventListener("pointerup", pointerUpTile, { passive: false });
+
         tile.style.width = "36px";
         tile.style.height = "36px";
         tile.style.display = "flex";
@@ -2761,6 +2777,7 @@ function gameMinesweeper(root) {
         tile.style.justifyContent = "center";
         tile.style.fontWeight = "900";
         tile.style.borderRadius = "12px";
+        tile.style.border = "none";
         tile.style.background = "rgba(255,255,255,.70)";
         tile.style.boxShadow = "0 10px 25px rgba(255, 100, 150, .18)";
         tile.style.cursor = "pointer";
@@ -2772,28 +2789,24 @@ function gameMinesweeper(root) {
     }
   }
 
-  // Attach UI handlers
   onFlagClick = () => setFlag();
   onRestartClick = () => buildBoard();
 
   flagBtn.addEventListener("click", onFlagClick);
   restartBtn.addEventListener("click", onRestartClick);
 
-  // Initial render
   buildBoard();
 
-  // Cleanup when leaving the game
   stopCurrentGame = () => {
     disposed = true;
 
-    // remove tile listeners
     for (let r = 0; r < board.length; r++) {
       for (let c = 0; c < board[r].length; c++) {
         board[r][c].removeEventListener("click", clickTile);
+        board[r][c].removeEventListener("pointerup", pointerUpTile);
       }
     }
 
-    // remove button listeners
     flagBtn.removeEventListener("click", onFlagClick);
     restartBtn.removeEventListener("click", onRestartClick);
 
@@ -2801,12 +2814,9 @@ function gameMinesweeper(root) {
   };
 }
 
-
 /***********************
-  Mini Game: Hangman (UPDATED)
-  - Shows underscores for unguessed letters
-  - Adds clickable on-screen keyboard
-  - Keeps typing support
+  Mini Game: Hangman (FIXED)
+  - Fixes hangman drawing for SVG parts (circle/line/etc.)
 ************************/
 function gameHangman(root) {
   touchAction();
@@ -2824,7 +2834,6 @@ function gameHangman(root) {
   wrap.classList.remove("hidden");
   root.appendChild(wrap);
 
-  // Elements (guarded)
   const wordElement = document.getElementById("word");
   const wrongLettersElement = document.getElementById("wrong-letters");
   const playAgainButton = document.getElementById("play-button");
@@ -2838,10 +2847,8 @@ function gameHangman(root) {
   const earnedAffectionEl = document.getElementById("aEarned");
   const restartBtn = document.getElementById("hRestartBtn");
 
-  // NEW: keyboard mount
   const kbdMount = document.getElementById("hKeyboard");
 
-  // If any required element is missing, fail gracefully
   const required = [
     wordElement,
     wrongLettersElement,
@@ -2873,7 +2880,6 @@ function gameHangman(root) {
   let disposed = false;
   let payoutDone = false;
 
-  // -------- helpers --------
   const normalizeWord = (w) => String(w || "").toLowerCase();
   const normalizedSelected = () => normalizeWord(selectedWord);
 
@@ -2905,7 +2911,6 @@ function gameHangman(root) {
   }
 
   function buildKeyboard() {
-    // simple 3-row layout to match “cute keyboard” vibe
     const rows = ["qwertyuiop", "asdfghjkl", "zxcvbnm"];
 
     kbdMount.innerHTML = rows
@@ -2921,7 +2926,6 @@ function gameHangman(root) {
       })
       .join("");
 
-    // click handler (delegated)
     const onKbdClick = (e) => {
       const t = e.target;
       if (!(t instanceof HTMLElement)) return;
@@ -2930,7 +2934,6 @@ function gameHangman(root) {
       handleGuess(letter);
     };
 
-    // store for cleanup
     buildKeyboard._onKbdClick = onKbdClick;
     kbdMount.addEventListener("click", onKbdClick);
   }
@@ -2945,17 +2948,14 @@ function gameHangman(root) {
   function displayWord() {
     const target = normalizedSelected();
 
-    // Show underscores for unknown letters
     wordElement.innerHTML = target
       .split("")
       .map((letter) => {
         const shown = correctLetters.includes(letter) ? letter.toUpperCase() : "_";
-        // use &nbsp; to keep spacing consistent
         return `<span class="h-letter">${shown}</span>`;
       })
       .join("");
 
-    // win check (compare guessed letters against target)
     const won = target.split("").every((ch) => correctLetters.includes(ch));
     if (won) {
       finalMessage.innerText = "You won 💗";
@@ -2964,6 +2964,13 @@ function gameHangman(root) {
       playable = false;
       if (!payoutDone) payout(true);
     }
+  }
+
+  // FIX: SVG parts need display "inline" (not "block") to show reliably
+  function setFigurePartVisible(part, visible) {
+    if (!part) return;
+    const isSvg = typeof SVGElement !== "undefined" && part instanceof SVGElement;
+    part.style.display = visible ? (isSvg ? "inline" : "block") : "none";
   }
 
   function updateWrongLettersElement() {
@@ -2975,7 +2982,7 @@ function gameHangman(root) {
     `;
 
     const errors = wrongLetters.length;
-    figureParts.forEach((part, idx) => (part.style.display = idx < errors ? "block" : "none"));
+    figureParts.forEach((part, idx) => setFigurePartVisible(part, idx < errors));
 
     if (errors === figureParts.length) {
       finalMessage.innerText = "You lost 😭";
@@ -3047,7 +3054,7 @@ function gameHangman(root) {
     wrongLettersElement.innerHTML = "";
     if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
     if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
-    figureParts.forEach((p) => (p.style.display = "none"));
+    figureParts.forEach((p) => setFigurePartVisible(p, false));
 
     resetKeyboard();
     displayWord();
@@ -3063,13 +3070,12 @@ function gameHangman(root) {
     handleGuess(letter);
   }
 
-  // ---------- init UI ----------
   popup.style.display = "none";
   notification.classList.remove("show");
   wrongLettersElement.innerHTML = "";
   if (earnedHeartsEl) earnedHeartsEl.innerText = "0";
   if (earnedAffectionEl) earnedAffectionEl.innerText = "0";
-  figureParts.forEach((p) => (p.style.display = "none"));
+  figureParts.forEach((p) => setFigurePartVisible(p, false));
 
   buildKeyboard();
   window.addEventListener("keypress", onKeyPress);
@@ -3098,7 +3104,6 @@ function gameHangman(root) {
     isMiniGameRunning = false;
   };
 }
-
 
 /***********************
   TRIAL 4: Minyoung Party (cute graphics, competitive mean)
@@ -3729,6 +3734,7 @@ document.addEventListener("keydown", (e) => {
 setTimeout(() => {
   if (Math.random() < 0.25) maybePopup("home");
 }, 700);
+
 
 
 
